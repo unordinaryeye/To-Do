@@ -6,9 +6,9 @@
 <title>Daily Routine</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="루틴">
+<meta name="apple-mobile-web-app-title" content="데일리루틴">
 <meta name="theme-color" content="#1C1917">
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRGFpbHkgUm91dGluZSIsInNob3J0X25hbWUiOiLro6jtjLQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZBRkFGOSIsInRoZW1lX2NvbG9yIjoiIzFDMTkxNyJ9">
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRGFpbHkgUm91dGluZSIsInNob3J0X25hbWUiOiLrjbDsnbzrpqzro6jti7QiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZBRkFGOSIsInRoZW1lX2NvbG9yIjoiIzFDMTkxNyJ9">
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -148,12 +148,12 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;back
 <script>
 // ★★★ 여기에 Firebase 설정을 붙여넣으세요 ★★★
 const firebaseConfig = {
-  apiKey: "AIzaSyAe7avifEe4sKx_JS6oe6CEcX9UCEKTzXQ",
-  authDomain: "daily-routine-1fbd8.firebaseapp.com",
-  projectId: "daily-routine-1fbd8",
-  storageBucket: "daily-routine-1fbd8.firebasestorage.app",
-  messagingSenderId: "139544196262",
-  appId: "1:139544196262:web:ceb8876580071b6368f067"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 // ── Firebase Init ──
@@ -423,7 +423,7 @@ if(!firebaseReady){
   syncHtml=`<div class="sync-section"><div class="sec-title">🔗 기기 동기화</div><button class="sync-btn sync-btn-primary" onclick="createSync()">새 코드 생성</button><div style="display:flex;align-items:center;gap:10px;margin:14px 0 6px"><div style="flex:1;height:1px;background:#BAE6FD"></div><span style="font-size:11px;color:#0284C7">또는 코드 입력</span><div style="flex:1;height:1px;background:#BAE6FD"></div></div><input class="sync-input" placeholder="6자리 코드" maxlength="6" value="${syncInput}" oninput="syncInput=this.value.toUpperCase()"><button class="sync-btn sync-btn-secondary" onclick="joinSync()">연결</button></div>`;
 }
 
-ov.innerHTML=`<div class="overlay" onclick="if(event.target===this){showSettings=false;render()}"><div class="settings-panel"><div class="panel-handle"></div><div class="panel-title">설정</div>
+ov.innerHTML=`<div class="overlay" onclick="if(event.target===this){showSettings=false;render()}"><div class="settings-panel"><div class="panel-handle"></div><div style="display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:20px"><div class="panel-title" style="margin-bottom:0">설정</div><button onclick="showSettings=false;render()" style="position:absolute;right:0;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:8px;border:1px solid #E7E5E4;background:#F5F5F4;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#78716C">✕</button></div>
 ${syncHtml}
 <div class="section-divider"></div>
 <div class="settings-item" onclick="doBackup()"><div class="si-icon" style="background:#DBEAFE">💾</div><div class="si-text"><div class="main">데이터 백업</div><div class="sub">파일로 백업 · 마지막: ${fmtBack(getLastBackup())}</div></div></div>
@@ -431,6 +431,7 @@ ${syncHtml}
 <div class="settings-item settings-info"><div class="si-icon" style="background:#F3E8FF">📊</div><div class="si-text"><div class="main">내 기록</div><div class="sub">루틴 ${routines.length}개 · 기록된 날 ${totalDays}일</div></div></div>
 <div style="height:8px"></div>
 <div class="settings-item settings-danger" onclick="showSettings=false;showConfirm=true;render()"><div class="si-icon" style="background:#FEE2E2">🗑️</div><div class="si-text"><div class="main">전체 초기화</div><div class="sub">모든 데이터 삭제</div></div></div>
+<button onclick="showSettings=false;render()" style="width:100%;padding:14px;border-radius:12px;border:1px solid #E7E5E4;background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;color:#57534E;margin-top:10px;transition:all .2s">닫기</button>
 </div></div>`}
 else if(showConfirm){
 ov.innerHTML=`<div class="overlay center" onclick="if(event.target===this){showConfirm=false;render()}"><div class="confirm-box"><div style="font-size:36px;margin-bottom:12px">⚠️</div><div class="msg">모든 루틴과 기록이 삭제됩니다.<br>정말 초기화할까요?</div><div class="btns"><button class="btn-cancel" onclick="showConfirm=false;render()">취소</button><button class="btn-danger" onclick="doReset()">초기화</button></div></div></div>`}
