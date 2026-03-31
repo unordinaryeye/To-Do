@@ -9,6 +9,11 @@
 <meta name="apple-mobile-web-app-title" content="루틴">
 <meta name="theme-color" content="#1C1917">
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRGFpbHkgUm91dGluZSIsInNob3J0X25hbWUiOiLro6jtjLQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZBRkFGOSIsInRoZW1lX2NvbG9yIjoiIzFDMTkxNyJ9">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -22,12 +27,17 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;back
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes toastIn{from{opacity:0;transform:translateY(40px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(40px) scale(.95)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .check-pop{animation:checkPop .25s ease}.fade-in{animation:fadeIn .3s ease forwards}.slide-in{animation:slideIn .3s ease forwards}.progress-bar{animation:progressGrow .6s ease}
 .container{max-width:640px;margin:0 auto;padding:0 16px}
 .header{padding:28px 0 20px;border-bottom:1px solid #E7E5E4}
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .header h1{font-family:'Outfit',sans-serif;font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
-.header p{font-size:13px;color:#A8A29E;margin-top:4px}
+.header .subtitle{font-size:13px;color:#A8A29E;margin-top:4px;display:flex;align-items:center;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.sync-dot.online{background:#10B981}
+.sync-dot.offline{background:#EF4444}
+.sync-dot.none{background:#D6D3D1}
 .header-right{display:flex;align-items:center;gap:8px}
 .settings-btn{width:36px;height:36px;border-radius:10px;border:1px solid #E7E5E4;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s;flex-shrink:0}
 .settings-btn:active{transform:scale(.93)}
@@ -79,20 +89,19 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;back
 .text-input{flex:1;padding:0 14px;border-radius:10px;border:1px solid #E7E5E4;font-size:14px;font-family:'Noto Sans KR',sans-serif;background:#FAFAF9;height:42px}
 .text-input:focus{outline:none;border-color:#A8A29E}
 .select-input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #E7E5E4;font-size:13px;font-family:'Noto Sans KR',sans-serif;background:#FAFAF9;color:#57534E;appearance:none;cursor:pointer}
-.select-input:focus{outline:none;border-color:#A8A29E}
 .add-btn{padding:10px 20px;border-radius:10px;border:none;background:#1C1917;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .2s}
 .add-btn:active{transform:scale(.97)}
 .delete-btn{background:none;border:none;cursor:pointer;color:#D6D3D1;font-size:18px;padding:4px;transition:color .2s;line-height:1}
 .edit-input{flex:1;padding:4px 8px;border-radius:6px;border:1px solid #D6D3D1;font-size:14px;font-family:'Noto Sans KR',sans-serif}
 .edit-input:focus{outline:none;border-color:#A8A29E}
 .empty-state{text-align:center;padding:60px 20px;color:#A8A29E}
-.empty-state .icon{font-size:40px;margin-bottom:12px}
 .content{padding-top:20px;padding-bottom:100px}
+.todo-delete{background:none;border:none;cursor:pointer;color:#D6D3D1;font-size:16px;padding:2px 4px;transition:color .2s;line-height:1;flex-shrink:0}
 
-/* Overlay & Settings */
+/* Overlay */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .overlay.center{align-items:center}
-.settings-panel{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:640px;padding:20px 20px calc(20px + env(safe-area-inset-bottom));animation:slideUp .3s ease}
+.settings-panel{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:640px;padding:20px 20px calc(20px + env(safe-area-inset-bottom));animation:slideUp .3s ease;max-height:85vh;overflow-y:auto}
 .panel-handle{width:36px;height:4px;border-radius:2px;background:#D6D3D1;margin:0 auto 20px}
 .panel-title{font-size:17px;font-weight:700;margin-bottom:20px;text-align:center}
 .settings-item{display:flex;align-items:center;gap:14px;padding:16px;background:#FAFAF9;border-radius:12px;margin-bottom:10px;cursor:pointer;transition:all .15s;border:1px solid #F5F5F4}
@@ -103,21 +112,29 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;back
 .settings-danger{background:#FEF2F2;border:1px solid #FECACA}
 .settings-danger .main{color:#DC2626}
 .settings-info{cursor:default;pointer-events:none}
-
-/* Toast */
-.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#1C1917;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:500;z-index:200;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,.2);animation:toastIn .3s ease;font-family:'Noto Sans KR',sans-serif;display:flex;align-items:center;gap:8px}
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#1C1917;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:500;z-index:200;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,.2);animation:toastIn .3s ease;font-family:'Noto Sans KR',sans-serif}
 .toast.out{animation:toastOut .3s ease forwards}
-
-/* Backup banner */
 .backup-banner{display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 16px;margin-bottom:16px;cursor:pointer;transition:all .15s}
 .backup-banner:active{background:#FEF3C7}
-
-/* Confirm */
 .confirm-box{background:#fff;border-radius:16px;width:300px;padding:24px;text-align:center;animation:slideUp .25s ease;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .confirm-box .msg{font-size:14px;color:#57534E;margin-bottom:20px;line-height:1.6}
 .confirm-box .btns{display:flex;gap:10px}
 .confirm-box .btn-cancel{flex:1;padding:12px;border-radius:10px;border:1px solid #E7E5E4;background:#fff;font-size:14px;font-weight:500;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
 .confirm-box .btn-danger{flex:1;padding:12px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+
+/* Sync UI */
+.sync-section{margin-top:10px;padding:16px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px}
+.sync-section .sec-title{font-size:13px;font-weight:600;color:#0369A1;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.sync-code-display{font-family:'Outfit',monospace;font-size:28px;font-weight:700;letter-spacing:.15em;text-align:center;padding:16px;background:#fff;border-radius:10px;border:1px solid #BAE6FD;color:#0369A1;margin-bottom:10px}
+.sync-input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid #BAE6FD;font-size:18px;font-family:'Outfit',monospace;text-align:center;letter-spacing:.15em;text-transform:uppercase;background:#fff}
+.sync-input:focus{outline:none;border-color:#0284C7}
+.sync-btn{width:100%;padding:12px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .2s;margin-top:8px}
+.sync-btn:active{transform:scale(.98)}
+.sync-btn-primary{background:#0284C7;color:#fff}
+.sync-btn-secondary{background:#fff;color:#0284C7;border:1px solid #BAE6FD;margin-top:6px}
+.sync-btn-disconnect{background:#fff;color:#EF4444;border:1px solid #FECACA;margin-top:6px}
+.sync-status{font-size:12px;color:#A8A29E;text-align:center;margin-top:8px}
+.section-divider{height:1px;background:#E7E5E4;margin:16px 0}
 
 #restoreInput{display:none}
 </style>
@@ -129,6 +146,32 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;back
 <input type="file" id="restoreInput" accept=".json">
 
 <script>
+// ★★★ 여기에 Firebase 설정을 붙여넣으세요 ★★★
+const firebaseConfig = {
+  apiKey: "AIzaSyAe7avifEe4sKx_JS6oe6CEcX9UCEKTzXQ",
+  authDomain: "daily-routine-1fbd8.firebaseapp.com",
+  projectId: "daily-routine-1fbd8",
+  storageBucket: "daily-routine-1fbd8.firebasestorage.app",
+  messagingSenderId: "139544196262",
+  appId: "1:139544196262:web:ceb8876580071b6368f067"
+};
+
+// ── Firebase Init ──
+let db = null;
+let unsubscribe = null;
+let syncConnected = false;
+let firebaseReady = false;
+let skipNextSync = false;
+
+try {
+  if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firebaseReady = true;
+  }
+} catch(e) { console.warn("Firebase init failed:", e); }
+
+// ── Constants ──
 const DAYS_KR=["일","월","화","수","목","금","토"];
 const CATEGORIES=[
   {id:"morning",label:"🌅 모닝 루틴",color:"#F59E0B"},
@@ -147,64 +190,159 @@ const DEFAULT_ROUTINES=[
   {id:"r6",text:"내일 할 일 정리",category:"evening",emoji:"📋"},
 ];
 const EMOJI_OPTIONS=["✅","💧","🤸","📝","🏃","📖","📋","🧘","💪","🎯","🧠","💊","🥗","☕","🛌","🎵","🖊️","💻","🌿","🙏"];
+const TODO_COLOR="#6366F1";
 
+// ── State ──
 let routines=JSON.parse(localStorage.getItem("routines")||"null")||[...DEFAULT_ROUTINES];
 let checks=JSON.parse(localStorage.getItem("checks")||"{}");
+let todos=JSON.parse(localStorage.getItem("todos")||"{}");
 let selectedDate=new Date();
 let view="daily",editingId=null,showEmojiPicker=false,showSettings=false,showConfirm=false;
 let newRoutine={text:"",category:"morning",emoji:"✅"};
+let todoInput="";
+let editingTodoId=null;
+let syncCode=localStorage.getItem("syncCode")||"";
+let syncInput="";
+let showSyncPanel=false;
 
-function save(){localStorage.setItem("routines",JSON.stringify(routines));localStorage.setItem("checks",JSON.stringify(checks))}
+// ── Save & Sync ──
+function saveLocal(){
+  localStorage.setItem("routines",JSON.stringify(routines));
+  localStorage.setItem("checks",JSON.stringify(checks));
+  localStorage.setItem("todos",JSON.stringify(todos));
+}
+
+let syncTimeout=null;
+function save(){
+  saveLocal();
+  if(syncCode&&firebaseReady&&!skipNextSync){
+    clearTimeout(syncTimeout);
+    syncTimeout=setTimeout(()=>pushToFirebase(),500);
+  }
+}
+
+function pushToFirebase(){
+  if(!db||!syncCode)return;
+  db.collection("sync").doc(syncCode).set({
+    routines,checks,todos,
+    lastUpdated:firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e=>console.warn("Sync push failed:",e));
+}
+
+function startSync(code){
+  if(!firebaseReady){toast("⚠️","Firebase가 설정되지 않았어요");return}
+  if(unsubscribe)unsubscribe();
+  syncCode=code;
+  localStorage.setItem("syncCode",code);
+  syncConnected=true;
+  
+  unsubscribe=db.collection("sync").doc(code).onSnapshot(snap=>{
+    if(!snap.exists)return;
+    const data=snap.data();
+    if(!data.routines)return;
+    
+    const local=JSON.stringify({routines,checks,todos});
+    const remote=JSON.stringify({routines:data.routines,checks:data.checks,todos:data.todos||{}});
+    if(local===remote)return;
+    
+    skipNextSync=true;
+    routines=data.routines;
+    checks=data.checks;
+    todos=data.todos||{};
+    saveLocal();
+    render();
+    setTimeout(()=>{skipNextSync=false},1000);
+  },err=>{
+    console.warn("Sync listen error:",err);
+    syncConnected=false;
+    render();
+  });
+  
+  render();
+}
+
+function stopSync(){
+  if(unsubscribe)unsubscribe();
+  unsubscribe=null;
+  syncCode="";
+  syncConnected=false;
+  localStorage.removeItem("syncCode");
+  toast("🔓","동기화가 해제되었어요");
+  render();
+}
+
+function generateCode(){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code="";
+  for(let i=0;i<6;i++)code+=chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function createSync(){
+  const code=generateCode();
+  pushToFirebaseWithCode(code).then(()=>{
+    startSync(code);
+    toast("✅","동기화 코드가 생성되었어요");
+  }).catch(()=>toast("❌","동기화 생성에 실패했어요"));
+}
+
+function pushToFirebaseWithCode(code){
+  return db.collection("sync").doc(code).set({
+    routines,checks,todos,
+    lastUpdated:firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+function joinSync(){
+  const code=syncInput.trim().toUpperCase();
+  if(code.length!==6){toast("⚠️","6자리 코드를 입력해주세요");return}
+  db.collection("sync").doc(code).get().then(snap=>{
+    if(snap.exists){
+      const data=snap.data();
+      routines=data.routines||routines;
+      checks=data.checks||checks;
+      todos=data.todos||todos;
+      saveLocal();
+      startSync(code);
+      toast("✅","동기화 연결 완료!");
+    }else{
+      toast("❌","존재하지 않는 코드예요");
+    }
+  }).catch(()=>toast("❌","연결에 실패했어요"));
+}
+
+// Auto-reconnect on load
+if(syncCode&&firebaseReady){startSync(syncCode)}
+
+// ── Helpers ──
 function getLastBackup(){return localStorage.getItem("lastBackup")||null}
 function setLastBackup(){localStorage.setItem("lastBackup",new Date().toISOString())}
-function needsReminder(){const l=getLastBackup();if(!l)return Object.keys(checks).length>3;return(Date.now()-new Date(l).getTime())/(1e3*3600*24)>7}
-function fmtBack(iso){if(!iso)return"백업한 적 없음";const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+function needsReminder(){if(syncCode)return false;const l=getLastBackup();if(!l)return Object.keys(checks).length>3;return(Date.now()-new Date(l).getTime())/(1e3*3600*24)>7}
+function fmtBack(iso){if(!iso)return"백업한 적 없음";const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
 
 let toastT=null;
-function toast(emoji,msg){
-  const r=document.getElementById("toast-root");
-  r.innerHTML=`<div class="toast" id="at">${emoji} ${msg}</div>`;
-  clearTimeout(toastT);
-  toastT=setTimeout(()=>{const t=document.getElementById("at");if(t){t.classList.add("out");setTimeout(()=>r.innerHTML="",300)}},2500);
-}
+function toast(emoji,msg){const r=document.getElementById("toast-root");r.innerHTML=`<div class="toast" id="at">${emoji} ${msg}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>{const t=document.getElementById("at");if(t){t.classList.add("out");setTimeout(()=>r.innerHTML="",300)}},2500)}
 
 function doBackup(){
-  const data={routines,checks,exportedAt:new Date().toISOString(),version:1};
+  const data={routines,checks,todos,exportedAt:new Date().toISOString(),version:2};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  const d=new Date();
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");const d=new Date();
   a.href=url;a.download=`루틴백업_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.json`;
-  a.click();URL.revokeObjectURL(url);
-  setLastBackup();showSettings=false;toast("✅","백업 파일이 저장되었어요");render();
+  a.click();URL.revokeObjectURL(url);setLastBackup();showSettings=false;toast("✅","백업 파일이 저장되었어요");render();
 }
-
 function doRestore(){document.getElementById("restoreInput").click()}
 document.getElementById("restoreInput").addEventListener("change",function(e){
-  const f=e.target.files[0];if(!f)return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    try{
-      const data=JSON.parse(ev.target.result);
-      if(!data.routines||!data.checks)throw 0;
-      routines=data.routines;checks=data.checks;save();
-      showSettings=false;toast("✅","데이터가 복원되었어요!");render();
-    }catch{toast("❌","파일을 읽을 수 없어요")}
-  };
+  const f=e.target.files[0];if(!f)return;const reader=new FileReader();
+  reader.onload=function(ev){try{const data=JSON.parse(ev.target.result);if(!data.routines||!data.checks)throw 0;routines=data.routines;checks=data.checks;if(data.todos)todos=data.todos;save();showSettings=false;toast("✅","데이터가 복원되었어요!");render()}catch{toast("❌","파일을 읽을 수 없어요")}};
   reader.readAsText(f);e.target.value="";
 });
-
-function doReset(){
-  routines=[...DEFAULT_ROUTINES];checks={};localStorage.removeItem("lastBackup");save();
-  showConfirm=false;showSettings=false;toast("🔄","초기화 완료");render();
-}
+function doReset(){routines=[...DEFAULT_ROUTINES];checks={};todos={};localStorage.removeItem("lastBackup");save();showConfirm=false;showSettings=false;toast("🔄","초기화 완료");render()}
 
 function fmt(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 function fmtKR(d){return`${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS_KR[d.getDay()]})`}
 function isToday(d){return fmt(d)===fmt(new Date())}
 function dateKey(){return fmt(selectedDate)}
-
-function getProgress(){const dc=checks[dateKey()]||{};const done=routines.filter(r=>dc[r.id]).length;return{done,total:routines.length,pct:routines.length?(done/routines.length*100):0}}
+function getProgress(){const dc=checks[dateKey()]||{};const rd=routines.filter(r=>dc[r.id]).length;const dt=todos[dateKey()]||[];const td=dt.filter(t=>t.done).length;const total=routines.length+dt.length;return{done:rd+td,total,pct:total?((rd+td)/total*100):0}}
 function getStreak(){let s=0;const d=new Date(selectedDate);for(let i=0;i<365;i++){const k=fmt(d);const dc=checks[k]||{};const a=routines.length>0&&routines.every(r=>dc[r.id]);if(i===0&&!a){d.setDate(d.getDate()-1);continue}if(i>0&&!a)break;if(a)s++;d.setDate(d.getDate()-1)}return s}
 function getWeek(){const ds=[];const s=new Date(selectedDate);s.setDate(s.getDate()-3);for(let i=0;i<7;i++){const d=new Date(s);d.setDate(d.getDate()+i);ds.push(d)}return ds}
 function grouped(){return CATEGORIES.map(c=>({...c,items:routines.filter(r=>r.category===c.id)})).filter(g=>g.items.length>0)}
@@ -213,11 +351,19 @@ function toggleCheck(id){const k=dateKey();if(!checks[k])checks[k]={};checks[k][
 function addRoutine(){if(!newRoutine.text.trim())return;routines.push({id:"r"+Date.now(),...newRoutine});newRoutine={text:"",category:"morning",emoji:"✅"};showEmojiPicker=false;save();render()}
 function deleteRoutine(id){routines=routines.filter(r=>r.id!==id);save();render()}
 function moveDate(n){selectedDate.setDate(selectedDate.getDate()+n);selectedDate=new Date(selectedDate);render()}
+function addTodo(){if(!todoInput.trim())return;const k=dateKey();if(!todos[k])todos[k]=[];todos[k].push({id:"t"+Date.now(),text:todoInput.trim(),done:false});todoInput="";save();render();setTimeout(()=>{const el=document.getElementById("todoInputField");if(el)el.focus()},50)}
+function toggleTodo(id){const k=dateKey();const item=(todos[k]||[]).find(t=>t.id===id);if(item)item.done=!item.done;save();render()}
+function deleteTodo(id){const k=dateKey();todos[k]=(todos[k]||[]).filter(t=>t.id!==id);if(todos[k].length===0)delete todos[k];save();render()}
+function updateTodoText(id,text){const item=(todos[dateKey()]||[]).find(t=>t.id===id);if(item)item.text=text}
 
+// ── Render ──
 function render(){
 const app=document.getElementById("app"),ov=document.getElementById("overlay-root");
-const p=getProgress(),week=getWeek(),dk=dateKey(),totalDays=Object.keys(checks).length;
-let h=`<div class="header"><div class="header-top"><div><h1>Daily Routine</h1><p>매일의 작은 습관이 큰 변화를 만듭니다</p></div><div class="header-right"><div class="tabs"><button class="tab-btn ${view==="daily"?"active":""}" onclick="view='daily';render()">체크리스트</button><button class="tab-btn ${view==="routines"?"active":""}" onclick="view='routines';render()">루틴 관리</button></div><button class="settings-btn" onclick="showSettings=true;render()">⚙️</button></div></div>`;
+const p=getProgress(),week=getWeek(),dk=dateKey(),totalDays=Object.keys(checks).length,dayTodos=todos[dk]||[];
+const syncStatus=syncCode?(syncConnected?"online":"offline"):"none";
+const syncLabel=syncCode?(syncConnected?"동기화 연결됨":"오프라인"):"";
+
+let h=`<div class="header"><div class="header-top"><div><h1>Daily Routine</h1><p class="subtitle">${syncCode?`<span class="sync-dot ${syncStatus}"></span> ${syncLabel}`:"매일의 작은 습관이 큰 변화를 만듭니다"}</p></div><div class="header-right"><div class="tabs"><button class="tab-btn ${view==="daily"?"active":""}" onclick="view='daily';render()">체크리스트</button><button class="tab-btn ${view==="routines"?"active":""}" onclick="view='routines';render()">루틴 관리</button></div><button class="settings-btn" onclick="showSettings=true;render()">⚙️</button></div></div>`;
 
 if(view==="daily"){
 h+=`<div class="fade-in"><div class="date-nav"><button class="arrow" onclick="moveDate(-1)">‹</button><span class="date-text">${fmtKR(selectedDate)}</span><button class="arrow" onclick="moveDate(1)">›</button>${!isToday(selectedDate)?'<button class="today-btn" onclick="selectedDate=new Date();render()">오늘</button>':''}</div><div class="week-row">`;
@@ -239,31 +385,52 @@ g.items.forEach(r=>{const c=!!tc[r.id];
 h+=`<div class="routine-item" onclick="toggleCheck('${r.id}')"><div class="checkbox ${c?"checked check-pop":"unchecked"}" style="${c?"background:"+g.color:""}">${c?'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div><span class="routine-emoji">${r.emoji}</span><span class="routine-text ${c?"done":""}">${r.text}</span></div>`});
 h+=`</div></div>`});
 
-if(!routines.length)h+=`<div class="empty-state"><div class="icon">📋</div><p style="font-size:14px;margin-bottom:4px">등록된 루틴이 없습니다</p><p style="font-size:12px"><span onclick="view='routines';render()" style="color:#1C1917;font-weight:600;cursor:pointer;text-decoration:underline">루틴 관리</span>에서 추가해보세요</p></div>`;
-if(p.pct===100&&p.total>0)h+=`<div class="complete-banner fade-in"><div style="font-size:36px;margin-bottom:8px">🎉</div><p style="font-size:15px;font-weight:600;color:#166534">오늘의 루틴 완료!</p><p style="font-size:12px;color:#4ADE80;margin-top:4px">대단해요, 꾸준함이 실력입니다</p></div>`;
+// Daily todos
+h+=`<div class="group slide-in" style="animation-delay:${gs.length*.05}s;margin-top:24px"><div class="group-header"><div class="group-bar" style="background:${TODO_COLOR}"></div><span class="group-label">📌 오늘의 할 일</span><span class="group-count">${dayTodos.filter(t=>t.done).length}/${dayTodos.length}</span></div>`;
+if(dayTodos.length>0){h+=`<div class="group-card">`;
+dayTodos.forEach(t=>{
+h+=`<div class="routine-item"><div class="checkbox ${t.done?"checked check-pop":"unchecked"}" style="${t.done?"background:"+TODO_COLOR:""}" onclick="toggleTodo('${t.id}')">${t.done?'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>`;
+if(editingTodoId===t.id){h+=`<input class="edit-input" id="editTodo-${t.id}" value="${t.text}" oninput="updateTodoText('${t.id}',this.value)" onblur="editingTodoId=null;save();render()" onkeydown="if(event.key==='Enter'){editingTodoId=null;save();render()}">`}
+else{h+=`<span class="routine-text ${t.done?"done":""}" style="flex:1;cursor:text" onclick="event.stopPropagation();editingTodoId='${t.id}';render();setTimeout(()=>{const el=document.getElementById('editTodo-${t.id}');if(el)el.focus()},50)">${t.text}</span>`}
+h+=`<button class="todo-delete" onclick="event.stopPropagation();deleteTodo('${t.id}')">×</button></div>`});
+h+=`</div>`}
+h+=`<div style="display:flex;gap:8px;margin-top:8px"><input id="todoInputField" class="text-input" style="height:38px;font-size:13px" value="${todoInput}" placeholder="할 일을 입력하세요" oninput="todoInput=this.value" onkeydown="if(event.key==='Enter')addTodo()"><button class="add-btn" style="padding:0 16px;height:38px" onclick="addTodo()">추가</button></div></div>`;
+
+if(!routines.length&&!dayTodos.length)h+=`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">📋</div><p style="font-size:14px;margin-bottom:4px">등록된 루틴이 없습니다</p><p style="font-size:12px"><span onclick="view='routines';render()" style="color:#1C1917;font-weight:600;cursor:pointer;text-decoration:underline">루틴 관리</span>에서 추가해보세요</p></div>`;
+if(p.pct===100&&p.total>0)h+=`<div class="complete-banner fade-in"><div style="font-size:36px;margin-bottom:8px">🎉</div><p style="font-size:15px;font-weight:600;color:#166534">오늘 할 일 모두 완료!</p><p style="font-size:12px;color:#4ADE80;margin-top:4px">대단해요, 꾸준함이 실력입니다</p></div>`;
 h+=`</div>`}
 
 if(view==="routines"){
 h+=`<div class="content fade-in"><div class="add-form"><div class="title">새 루틴 추가</div><div class="add-row"><div style="position:relative"><button class="emoji-btn" onclick="showEmojiPicker=!showEmojiPicker;render()">${newRoutine.emoji}</button>${showEmojiPicker?`<div class="emoji-picker">${EMOJI_OPTIONS.map(e=>`<button class="emoji-option ${newRoutine.emoji===e?"selected":""}" onclick="newRoutine.emoji='${e}';showEmojiPicker=false;render()">${e}</button>`).join("")}</div>`:""}</div><input class="text-input" value="${newRoutine.text}" placeholder="루틴 이름을 입력하세요" oninput="newRoutine.text=this.value" onkeydown="if(event.key==='Enter')addRoutine()"></div><div style="display:flex;gap:8px;align-items:center"><select class="select-input" onchange="newRoutine.category=this.value">${CATEGORIES.map(c=>`<option value="${c.id}" ${newRoutine.category===c.id?"selected":""}>${c.label}</option>`).join("")}</select><button class="add-btn" onclick="addRoutine()">추가</button></div></div>`;
-
 grouped().forEach((g,gi)=>{
 h+=`<div class="group slide-in" style="animation-delay:${gi*.05}s"><div class="group-header"><div class="group-bar" style="background:${g.color}"></div><span class="group-label">${g.label}</span><span class="group-count">(${g.items.length})</span></div><div class="group-card">`;
 g.items.forEach(r=>{
 h+=`<div class="routine-item"><span class="routine-emoji" style="font-size:16px">${r.emoji}</span>${editingId===r.id?`<input class="edit-input" id="edit-${r.id}" value="${r.text}" oninput="routines.find(x=>x.id==='${r.id}').text=this.value" onblur="editingId=null;save();render()" onkeydown="if(event.key==='Enter'){editingId=null;save();render()}">`:`<span class="routine-text" style="flex:1;cursor:text" onclick="editingId='${r.id}';render();setTimeout(()=>{const el=document.getElementById('edit-${r.id}');if(el)el.focus()},50)">${r.text}</span>`}<button class="delete-btn" onclick="event.stopPropagation();deleteRoutine('${r.id}')">×</button></div>`});
 h+=`</div></div>`});
-if(!routines.length)h+=`<div class="empty-state"><div class="icon">🌱</div><p style="font-size:14px">위에서 첫 번째 루틴을 추가해보세요</p></div>`;
+if(!routines.length)h+=`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">🌱</div><p style="font-size:14px">위에서 첫 번째 루틴을 추가해보세요</p></div>`;
 h+=`</div>`}
 
 app.innerHTML=h;
 
-// Overlay
+// ── Settings Overlay ──
 if(showSettings){
+let syncHtml="";
+if(!firebaseReady){
+  syncHtml=`<div class="sync-section" style="background:#FEF2F2;border-color:#FECACA"><div class="sec-title" style="color:#DC2626">⚠️ Firebase 미설정</div><p style="font-size:12px;color:#92400E;line-height:1.5">index.html 상단의 firebaseConfig에<br>Firebase 프로젝트 정보를 입력해주세요.</p></div>`;
+} else if(syncCode){
+  syncHtml=`<div class="sync-section"><div class="sec-title">🔗 동기화 연결됨</div><div class="sync-code-display">${syncCode}</div><p class="sync-status"><span class="sync-dot ${syncConnected?"online":"offline"}" style="vertical-align:middle"></span> ${syncConnected?"실시간 동기화 중":"재연결 시도 중..."}</p><button class="sync-btn sync-btn-disconnect" onclick="stopSync()">동기화 해제</button></div>`;
+} else {
+  syncHtml=`<div class="sync-section"><div class="sec-title">🔗 기기 동기화</div><button class="sync-btn sync-btn-primary" onclick="createSync()">새 코드 생성</button><div style="display:flex;align-items:center;gap:10px;margin:14px 0 6px"><div style="flex:1;height:1px;background:#BAE6FD"></div><span style="font-size:11px;color:#0284C7">또는 코드 입력</span><div style="flex:1;height:1px;background:#BAE6FD"></div></div><input class="sync-input" placeholder="6자리 코드" maxlength="6" value="${syncInput}" oninput="syncInput=this.value.toUpperCase()"><button class="sync-btn sync-btn-secondary" onclick="joinSync()">연결</button></div>`;
+}
+
 ov.innerHTML=`<div class="overlay" onclick="if(event.target===this){showSettings=false;render()}"><div class="settings-panel"><div class="panel-handle"></div><div class="panel-title">설정</div>
-<div class="settings-item" onclick="doBackup()"><div class="si-icon" style="background:#DBEAFE">💾</div><div class="si-text"><div class="main">데이터 백업</div><div class="sub">파일 앱에 백업 파일을 저장해요 · 마지막: ${fmtBack(getLastBackup())}</div></div></div>
-<div class="settings-item" onclick="doRestore()"><div class="si-icon" style="background:#FEF3C7">📂</div><div class="si-text"><div class="main">데이터 복원</div><div class="sub">백업 파일을 불러와서 데이터를 복원해요</div></div></div>
+${syncHtml}
+<div class="section-divider"></div>
+<div class="settings-item" onclick="doBackup()"><div class="si-icon" style="background:#DBEAFE">💾</div><div class="si-text"><div class="main">데이터 백업</div><div class="sub">파일로 백업 · 마지막: ${fmtBack(getLastBackup())}</div></div></div>
+<div class="settings-item" onclick="doRestore()"><div class="si-icon" style="background:#FEF3C7">📂</div><div class="si-text"><div class="main">데이터 복원</div><div class="sub">백업 파일에서 복원</div></div></div>
 <div class="settings-item settings-info"><div class="si-icon" style="background:#F3E8FF">📊</div><div class="si-text"><div class="main">내 기록</div><div class="sub">루틴 ${routines.length}개 · 기록된 날 ${totalDays}일</div></div></div>
 <div style="height:8px"></div>
-<div class="settings-item settings-danger" onclick="showSettings=false;showConfirm=true;render()"><div class="si-icon" style="background:#FEE2E2">🗑️</div><div class="si-text"><div class="main">전체 초기화</div><div class="sub">모든 루틴과 체크 기록을 삭제해요</div></div></div>
+<div class="settings-item settings-danger" onclick="showSettings=false;showConfirm=true;render()"><div class="si-icon" style="background:#FEE2E2">🗑️</div><div class="si-text"><div class="main">전체 초기화</div><div class="sub">모든 데이터 삭제</div></div></div>
 </div></div>`}
 else if(showConfirm){
 ov.innerHTML=`<div class="overlay center" onclick="if(event.target===this){showConfirm=false;render()}"><div class="confirm-box"><div style="font-size:36px;margin-bottom:12px">⚠️</div><div class="msg">모든 루틴과 기록이 삭제됩니다.<br>정말 초기화할까요?</div><div class="btns"><button class="btn-cancel" onclick="showConfirm=false;render()">취소</button><button class="btn-danger" onclick="doReset()">초기화</button></div></div></div>`}
