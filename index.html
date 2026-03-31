@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Daily Routine</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="루틴">
+<meta name="theme-color" content="#1C1917">
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRGFpbHkgUm91dGluZSIsInNob3J0X25hbWUiOiLro6jtjLQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZBRkFGOSIsInRoZW1lX2NvbG9yIjoiIzFDMTkxNyJ9">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(180deg,#FAFAF9 0%,#F5F5F4 100%);color:#1C1917;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:0;display:none}
+@keyframes checkPop{0%{transform:scale(.8)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes progressGrow{from{width:0}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(40px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(40px) scale(.95)}}
+.check-pop{animation:checkPop .25s ease}.fade-in{animation:fadeIn .3s ease forwards}.slide-in{animation:slideIn .3s ease forwards}.progress-bar{animation:progressGrow .6s ease}
+.container{max-width:640px;margin:0 auto;padding:0 16px}
+.header{padding:28px 0 20px;border-bottom:1px solid #E7E5E4}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.header h1{font-family:'Outfit',sans-serif;font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.header p{font-size:13px;color:#A8A29E;margin-top:4px}
+.header-right{display:flex;align-items:center;gap:8px}
+.settings-btn{width:36px;height:36px;border-radius:10px;border:1px solid #E7E5E4;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s;flex-shrink:0}
+.settings-btn:active{transform:scale(.93)}
+.tabs{display:flex;gap:6px;background:#F5F5F4;border-radius:10px;padding:3px}
+.tab-btn{padding:7px 14px;border-radius:8px;border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .2s;background:transparent;color:#A8A29E}
+.tab-btn.active{background:#fff;color:#1C1917;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.date-nav{display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:4px}
+.date-nav button.arrow{background:none;border:none;cursor:pointer;font-size:18px;color:#78716C;padding:4px}
+.date-nav .date-text{font-size:16px;font-weight:600;min-width:140px;text-align:center}
+.today-btn{background:#1C1917;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+.week-row{display:flex;gap:4px;justify-content:center}
+.week-day{display:flex;flex-direction:column;align-items:center;gap:4px;background:transparent;border:none;border-radius:10px;padding:6px 10px;cursor:pointer;min-width:44px;transition:all .2s}
+.week-day.selected{background:#1C1917}
+.week-day .lbl{font-size:10px;font-weight:500;color:#A8A29E}
+.week-day .num{font-size:14px;font-weight:600;color:#57534E}
+.week-day.selected .num{color:#fff}
+.week-day .dot{width:5px;height:5px;border-radius:50%}
+.stats{display:flex;gap:10px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #E7E5E4;transition:all .2s}
+.stat-card .label{font-size:11px;color:#A8A29E;font-weight:500;margin-bottom:6px}
+.progress-track{flex:1;height:6px;background:#F5F5F4;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.stat-number{font-size:14px;font-weight:700;font-family:'Outfit',sans-serif}
+.streak-number{font-size:20px;font-weight:700;font-family:'Outfit',sans-serif}
+.streak-unit{font-size:11px;color:#A8A29E;font-weight:400}
+.group{margin-bottom:16px}
+.group-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:0 4px}
+.group-bar{width:3px;height:14px;border-radius:2px}
+.group-label{font-size:13px;font-weight:600;color:#57534E}
+.group-count{font-size:11px;color:#A8A29E;margin-left:auto}
+.group-card{background:#fff;border-radius:12px;border:1px solid #E7E5E4;overflow:hidden}
+.routine-item{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;transition:all .15s}
+.routine-item:active{background:#F5F5F4}
+.routine-item+.routine-item{border-top:1px solid #F5F5F4}
+.checkbox{width:22px;height:22px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.checkbox.unchecked{border:2px solid #D6D3D1;background:transparent}
+.checkbox.checked{border:none}
+.routine-emoji{font-size:15px;margin-right:4px}
+.routine-text{font-size:14px;transition:all .2s}
+.routine-text.done{color:#A8A29E;text-decoration:line-through}
+.complete-banner{text-align:center;padding:24px 20px;margin-top:8px;background:linear-gradient(135deg,#ECFDF5,#F0FDF4);border-radius:12px;border:1px solid #BBF7D0}
+.add-form{background:#fff;border-radius:12px;border:1px solid #E7E5E4;padding:16px;margin-bottom:24px}
+.add-form .title{font-size:13px;font-weight:600;color:#57534E;margin-bottom:12px}
+.add-row{display:flex;gap:8px;margin-bottom:10px}
+.emoji-btn{width:42px;height:42px;border-radius:10px;border:1px solid #E7E5E4;background:#FAFAF9;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.emoji-picker{position:absolute;top:48px;left:0;background:#fff;border-radius:12px;border:1px solid #E7E5E4;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:10;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:200px}
+.emoji-option{width:36px;height:36px;border-radius:8px;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:transparent}
+.emoji-option.selected{background:#F5F5F4}
+.text-input{flex:1;padding:0 14px;border-radius:10px;border:1px solid #E7E5E4;font-size:14px;font-family:'Noto Sans KR',sans-serif;background:#FAFAF9;height:42px}
+.text-input:focus{outline:none;border-color:#A8A29E}
+.select-input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #E7E5E4;font-size:13px;font-family:'Noto Sans KR',sans-serif;background:#FAFAF9;color:#57534E;appearance:none;cursor:pointer}
+.select-input:focus{outline:none;border-color:#A8A29E}
+.add-btn{padding:10px 20px;border-radius:10px;border:none;background:#1C1917;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .2s}
+.add-btn:active{transform:scale(.97)}
+.delete-btn{background:none;border:none;cursor:pointer;color:#D6D3D1;font-size:18px;padding:4px;transition:color .2s;line-height:1}
+.edit-input{flex:1;padding:4px 8px;border-radius:6px;border:1px solid #D6D3D1;font-size:14px;font-family:'Noto Sans KR',sans-serif}
+.edit-input:focus{outline:none;border-color:#A8A29E}
+.empty-state{text-align:center;padding:60px 20px;color:#A8A29E}
+.empty-state .icon{font-size:40px;margin-bottom:12px}
+.content{padding-top:20px;padding-bottom:100px}
+
+/* Overlay & Settings */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.overlay.center{align-items:center}
+.settings-panel{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:640px;padding:20px 20px calc(20px + env(safe-area-inset-bottom));animation:slideUp .3s ease}
+.panel-handle{width:36px;height:4px;border-radius:2px;background:#D6D3D1;margin:0 auto 20px}
+.panel-title{font-size:17px;font-weight:700;margin-bottom:20px;text-align:center}
+.settings-item{display:flex;align-items:center;gap:14px;padding:16px;background:#FAFAF9;border-radius:12px;margin-bottom:10px;cursor:pointer;transition:all .15s;border:1px solid #F5F5F4}
+.settings-item:active{transform:scale(.98)}
+.si-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.si-text .main{font-size:14px;font-weight:600;color:#1C1917}
+.si-text .sub{font-size:12px;color:#A8A29E;margin-top:2px}
+.settings-danger{background:#FEF2F2;border:1px solid #FECACA}
+.settings-danger .main{color:#DC2626}
+.settings-info{cursor:default;pointer-events:none}
+
+/* Toast */
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#1C1917;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:500;z-index:200;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,.2);animation:toastIn .3s ease;font-family:'Noto Sans KR',sans-serif;display:flex;align-items:center;gap:8px}
+.toast.out{animation:toastOut .3s ease forwards}
+
+/* Backup banner */
+.backup-banner{display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 16px;margin-bottom:16px;cursor:pointer;transition:all .15s}
+.backup-banner:active{background:#FEF3C7}
+
+/* Confirm */
+.confirm-box{background:#fff;border-radius:16px;width:300px;padding:24px;text-align:center;animation:slideUp .25s ease;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.confirm-box .msg{font-size:14px;color:#57534E;margin-bottom:20px;line-height:1.6}
+.confirm-box .btns{display:flex;gap:10px}
+.confirm-box .btn-cancel{flex:1;padding:12px;border-radius:10px;border:1px solid #E7E5E4;background:#fff;font-size:14px;font-weight:500;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+.confirm-box .btn-danger{flex:1;padding:12px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+
+#restoreInput{display:none}
+</style>
+</head>
+<body>
+<div class="container" id="app"></div>
+<div id="overlay-root"></div>
+<div id="toast-root"></div>
+<input type="file" id="restoreInput" accept=".json">
+
+<script>
+const DAYS_KR=["일","월","화","수","목","금","토"];
+const CATEGORIES=[
+  {id:"morning",label:"🌅 모닝 루틴",color:"#F59E0B"},
+  {id:"work",label:"💼 업무",color:"#3B82F6"},
+  {id:"health",label:"💪 건강",color:"#10B981"},
+  {id:"evening",label:"🌙 이브닝 루틴",color:"#8B5CF6"},
+  {id:"selfcare",label:"🧘 셀프케어",color:"#EC4899"},
+  {id:"study",label:"📚 학습",color:"#F97316"},
+];
+const DEFAULT_ROUTINES=[
+  {id:"r1",text:"물 한 잔 마시기",category:"morning",emoji:"💧"},
+  {id:"r2",text:"10분 스트레칭",category:"morning",emoji:"🤸"},
+  {id:"r3",text:"감사 일기 쓰기",category:"morning",emoji:"📝"},
+  {id:"r4",text:"30분 운동",category:"health",emoji:"🏃"},
+  {id:"r5",text:"독서 30분",category:"evening",emoji:"📖"},
+  {id:"r6",text:"내일 할 일 정리",category:"evening",emoji:"📋"},
+];
+const EMOJI_OPTIONS=["✅","💧","🤸","📝","🏃","📖","📋","🧘","💪","🎯","🧠","💊","🥗","☕","🛌","🎵","🖊️","💻","🌿","🙏"];
+
+let routines=JSON.parse(localStorage.getItem("routines")||"null")||[...DEFAULT_ROUTINES];
+let checks=JSON.parse(localStorage.getItem("checks")||"{}");
+let selectedDate=new Date();
+let view="daily",editingId=null,showEmojiPicker=false,showSettings=false,showConfirm=false;
+let newRoutine={text:"",category:"morning",emoji:"✅"};
+
+function save(){localStorage.setItem("routines",JSON.stringify(routines));localStorage.setItem("checks",JSON.stringify(checks))}
+function getLastBackup(){return localStorage.getItem("lastBackup")||null}
+function setLastBackup(){localStorage.setItem("lastBackup",new Date().toISOString())}
+function needsReminder(){const l=getLastBackup();if(!l)return Object.keys(checks).length>3;return(Date.now()-new Date(l).getTime())/(1e3*3600*24)>7}
+function fmtBack(iso){if(!iso)return"백업한 적 없음";const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+
+let toastT=null;
+function toast(emoji,msg){
+  const r=document.getElementById("toast-root");
+  r.innerHTML=`<div class="toast" id="at">${emoji} ${msg}</div>`;
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>{const t=document.getElementById("at");if(t){t.classList.add("out");setTimeout(()=>r.innerHTML="",300)}},2500);
+}
+
+function doBackup(){
+  const data={routines,checks,exportedAt:new Date().toISOString(),version:1};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const d=new Date();
+  a.href=url;a.download=`루틴백업_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.json`;
+  a.click();URL.revokeObjectURL(url);
+  setLastBackup();showSettings=false;toast("✅","백업 파일이 저장되었어요");render();
+}
+
+function doRestore(){document.getElementById("restoreInput").click()}
+document.getElementById("restoreInput").addEventListener("change",function(e){
+  const f=e.target.files[0];if(!f)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.routines||!data.checks)throw 0;
+      routines=data.routines;checks=data.checks;save();
+      showSettings=false;toast("✅","데이터가 복원되었어요!");render();
+    }catch{toast("❌","파일을 읽을 수 없어요")}
+  };
+  reader.readAsText(f);e.target.value="";
+});
+
+function doReset(){
+  routines=[...DEFAULT_ROUTINES];checks={};localStorage.removeItem("lastBackup");save();
+  showConfirm=false;showSettings=false;toast("🔄","초기화 완료");render();
+}
+
+function fmt(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function fmtKR(d){return`${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS_KR[d.getDay()]})`}
+function isToday(d){return fmt(d)===fmt(new Date())}
+function dateKey(){return fmt(selectedDate)}
+
+function getProgress(){const dc=checks[dateKey()]||{};const done=routines.filter(r=>dc[r.id]).length;return{done,total:routines.length,pct:routines.length?(done/routines.length*100):0}}
+function getStreak(){let s=0;const d=new Date(selectedDate);for(let i=0;i<365;i++){const k=fmt(d);const dc=checks[k]||{};const a=routines.length>0&&routines.every(r=>dc[r.id]);if(i===0&&!a){d.setDate(d.getDate()-1);continue}if(i>0&&!a)break;if(a)s++;d.setDate(d.getDate()-1)}return s}
+function getWeek(){const ds=[];const s=new Date(selectedDate);s.setDate(s.getDate()-3);for(let i=0;i<7;i++){const d=new Date(s);d.setDate(d.getDate()+i);ds.push(d)}return ds}
+function grouped(){return CATEGORIES.map(c=>({...c,items:routines.filter(r=>r.category===c.id)})).filter(g=>g.items.length>0)}
+
+function toggleCheck(id){const k=dateKey();if(!checks[k])checks[k]={};checks[k][id]=!checks[k][id];save();render()}
+function addRoutine(){if(!newRoutine.text.trim())return;routines.push({id:"r"+Date.now(),...newRoutine});newRoutine={text:"",category:"morning",emoji:"✅"};showEmojiPicker=false;save();render()}
+function deleteRoutine(id){routines=routines.filter(r=>r.id!==id);save();render()}
+function moveDate(n){selectedDate.setDate(selectedDate.getDate()+n);selectedDate=new Date(selectedDate);render()}
+
+function render(){
+const app=document.getElementById("app"),ov=document.getElementById("overlay-root");
+const p=getProgress(),week=getWeek(),dk=dateKey(),totalDays=Object.keys(checks).length;
+let h=`<div class="header"><div class="header-top"><div><h1>Daily Routine</h1><p>매일의 작은 습관이 큰 변화를 만듭니다</p></div><div class="header-right"><div class="tabs"><button class="tab-btn ${view==="daily"?"active":""}" onclick="view='daily';render()">체크리스트</button><button class="tab-btn ${view==="routines"?"active":""}" onclick="view='routines';render()">루틴 관리</button></div><button class="settings-btn" onclick="showSettings=true;render()">⚙️</button></div></div>`;
+
+if(view==="daily"){
+h+=`<div class="fade-in"><div class="date-nav"><button class="arrow" onclick="moveDate(-1)">‹</button><span class="date-text">${fmtKR(selectedDate)}</span><button class="arrow" onclick="moveDate(1)">›</button>${!isToday(selectedDate)?'<button class="today-btn" onclick="selectedDate=new Date();render()">오늘</button>':''}</div><div class="week-row">`;
+week.forEach(d=>{const k=fmt(d),dc=checks[k]||{},done=routines.length>0&&routines.every(r=>dc[r.id]),partial=routines.some(r=>dc[r.id]),sel=k===dk,dot=done?"#10B981":partial?"#F59E0B":"#E7E5E4";
+h+=`<button class="week-day ${sel?"selected":""}" onclick="selectedDate=new Date('${d.toISOString()}');render()"><span class="lbl">${DAYS_KR[d.getDay()]}</span><span class="num">${d.getDate()}</span><div class="dot" style="background:${dot}"></div></button>`});
+h+=`</div></div>`}
+h+=`</div>`;
+
+if(view==="daily"){
+const pc=p.pct===100?"#10B981":p.pct>50?"#F59E0B":"#EF4444";
+h+=`<div class="content fade-in">`;
+if(needsReminder())h+=`<div class="backup-banner" onclick="showSettings=true;render()"><span style="font-size:22px">💾</span><div><div style="font-size:13px;color:#92400E">데이터 백업을 해두면 안전해요</div><div style="font-size:12px;color:#D97706;font-weight:600;margin-top:2px">탭해서 백업하기 →</div></div></div>`;
+h+=`<div class="stats"><div class="stat-card" style="flex:1"><div class="label">진행률</div><div style="display:flex;align-items:center;gap:10px"><div class="progress-track"><div class="progress-fill progress-bar" style="width:${p.pct}%;background:${pc}"></div></div><span class="stat-number">${p.done}/${p.total}</span></div></div><div class="stat-card" style="min-width:80px;text-align:center"><div class="label">연속</div><div><span class="streak-number">${getStreak()}</span><span class="streak-unit">일</span></div></div></div>`;
+
+const gs=grouped(),tc=checks[dk]||{};
+gs.forEach((g,gi)=>{
+h+=`<div class="group slide-in" style="animation-delay:${gi*.05}s"><div class="group-header"><div class="group-bar" style="background:${g.color}"></div><span class="group-label">${g.label}</span><span class="group-count">${g.items.filter(r=>tc[r.id]).length}/${g.items.length}</span></div><div class="group-card">`;
+g.items.forEach(r=>{const c=!!tc[r.id];
+h+=`<div class="routine-item" onclick="toggleCheck('${r.id}')"><div class="checkbox ${c?"checked check-pop":"unchecked"}" style="${c?"background:"+g.color:""}">${c?'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div><span class="routine-emoji">${r.emoji}</span><span class="routine-text ${c?"done":""}">${r.text}</span></div>`});
+h+=`</div></div>`});
+
+if(!routines.length)h+=`<div class="empty-state"><div class="icon">📋</div><p style="font-size:14px;margin-bottom:4px">등록된 루틴이 없습니다</p><p style="font-size:12px"><span onclick="view='routines';render()" style="color:#1C1917;font-weight:600;cursor:pointer;text-decoration:underline">루틴 관리</span>에서 추가해보세요</p></div>`;
+if(p.pct===100&&p.total>0)h+=`<div class="complete-banner fade-in"><div style="font-size:36px;margin-bottom:8px">🎉</div><p style="font-size:15px;font-weight:600;color:#166534">오늘의 루틴 완료!</p><p style="font-size:12px;color:#4ADE80;margin-top:4px">대단해요, 꾸준함이 실력입니다</p></div>`;
+h+=`</div>`}
+
+if(view==="routines"){
+h+=`<div class="content fade-in"><div class="add-form"><div class="title">새 루틴 추가</div><div class="add-row"><div style="position:relative"><button class="emoji-btn" onclick="showEmojiPicker=!showEmojiPicker;render()">${newRoutine.emoji}</button>${showEmojiPicker?`<div class="emoji-picker">${EMOJI_OPTIONS.map(e=>`<button class="emoji-option ${newRoutine.emoji===e?"selected":""}" onclick="newRoutine.emoji='${e}';showEmojiPicker=false;render()">${e}</button>`).join("")}</div>`:""}</div><input class="text-input" value="${newRoutine.text}" placeholder="루틴 이름을 입력하세요" oninput="newRoutine.text=this.value" onkeydown="if(event.key==='Enter')addRoutine()"></div><div style="display:flex;gap:8px;align-items:center"><select class="select-input" onchange="newRoutine.category=this.value">${CATEGORIES.map(c=>`<option value="${c.id}" ${newRoutine.category===c.id?"selected":""}>${c.label}</option>`).join("")}</select><button class="add-btn" onclick="addRoutine()">추가</button></div></div>`;
+
+grouped().forEach((g,gi)=>{
+h+=`<div class="group slide-in" style="animation-delay:${gi*.05}s"><div class="group-header"><div class="group-bar" style="background:${g.color}"></div><span class="group-label">${g.label}</span><span class="group-count">(${g.items.length})</span></div><div class="group-card">`;
+g.items.forEach(r=>{
+h+=`<div class="routine-item"><span class="routine-emoji" style="font-size:16px">${r.emoji}</span>${editingId===r.id?`<input class="edit-input" id="edit-${r.id}" value="${r.text}" oninput="routines.find(x=>x.id==='${r.id}').text=this.value" onblur="editingId=null;save();render()" onkeydown="if(event.key==='Enter'){editingId=null;save();render()}">`:`<span class="routine-text" style="flex:1;cursor:text" onclick="editingId='${r.id}';render();setTimeout(()=>{const el=document.getElementById('edit-${r.id}');if(el)el.focus()},50)">${r.text}</span>`}<button class="delete-btn" onclick="event.stopPropagation();deleteRoutine('${r.id}')">×</button></div>`});
+h+=`</div></div>`});
+if(!routines.length)h+=`<div class="empty-state"><div class="icon">🌱</div><p style="font-size:14px">위에서 첫 번째 루틴을 추가해보세요</p></div>`;
+h+=`</div>`}
+
+app.innerHTML=h;
+
+// Overlay
+if(showSettings){
+ov.innerHTML=`<div class="overlay" onclick="if(event.target===this){showSettings=false;render()}"><div class="settings-panel"><div class="panel-handle"></div><div class="panel-title">설정</div>
+<div class="settings-item" onclick="doBackup()"><div class="si-icon" style="background:#DBEAFE">💾</div><div class="si-text"><div class="main">데이터 백업</div><div class="sub">파일 앱에 백업 파일을 저장해요 · 마지막: ${fmtBack(getLastBackup())}</div></div></div>
+<div class="settings-item" onclick="doRestore()"><div class="si-icon" style="background:#FEF3C7">📂</div><div class="si-text"><div class="main">데이터 복원</div><div class="sub">백업 파일을 불러와서 데이터를 복원해요</div></div></div>
+<div class="settings-item settings-info"><div class="si-icon" style="background:#F3E8FF">📊</div><div class="si-text"><div class="main">내 기록</div><div class="sub">루틴 ${routines.length}개 · 기록된 날 ${totalDays}일</div></div></div>
+<div style="height:8px"></div>
+<div class="settings-item settings-danger" onclick="showSettings=false;showConfirm=true;render()"><div class="si-icon" style="background:#FEE2E2">🗑️</div><div class="si-text"><div class="main">전체 초기화</div><div class="sub">모든 루틴과 체크 기록을 삭제해요</div></div></div>
+</div></div>`}
+else if(showConfirm){
+ov.innerHTML=`<div class="overlay center" onclick="if(event.target===this){showConfirm=false;render()}"><div class="confirm-box"><div style="font-size:36px;margin-bottom:12px">⚠️</div><div class="msg">모든 루틴과 기록이 삭제됩니다.<br>정말 초기화할까요?</div><div class="btns"><button class="btn-cancel" onclick="showConfirm=false;render()">취소</button><button class="btn-danger" onclick="doReset()">초기화</button></div></div></div>`}
+else{ov.innerHTML=""}
+}
+
+render();
+</script>
+</body>
+</html>
