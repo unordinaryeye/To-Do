@@ -61,3 +61,19 @@ suite("mandala: 리듀서", (test) => {
     assertEqual(state.data.habits.hx.name, "새");
   });
 });
+
+suite("mandala: 압축 저장과 링크 정리", (test) => {
+  test("빈 칸은 null로 압축되고 normalize로 다시 펼쳐진다", () => {
+    const m = setActionText(null, 3, 2, "달리기");
+    assertEqual(m.sectors.filter(Boolean).length, 1);
+    assertEqual(m.sectors[3].actions.filter(Boolean).length, 1);
+    assertEqual(normalizeMandala(m).sectors[3].actions[2].text, "달리기");
+    assertEqual(setActionText(m, 3, 2, ""), null, "전부 비면 null");
+  });
+  test("습관을 삭제하면 만다라트 링크도 사라진다", () => {
+    let state = rootReducer({ data: defaultData(TODAY), ui: initialUi({ today: TODAY, syncCode: "", firebaseReady: false }) }, { type: A.MANDALA_LINK, tagId: "health", sector: 0, action: 0, habitId: "r4", on: true });
+    state = rootReducer(state, { type: A.HABIT_DELETE, id: "r4" });
+    assertEqual(state.data.goalTags.health.mandala, null);
+    assertDeepEqual(cellsLinkedToHabit(state.data.goalTags, "r4"), []);
+  });
+});

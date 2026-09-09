@@ -1,7 +1,7 @@
 import { makePolicy, applySettingsFrom, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy, pausePolicies, resumePolicies, policyAt } from "../domain/schedule.js";
 import { addDays, compareKeys } from "../utils/date.js";
 import { quadrantRank } from "../domain/todo.js";
-import { setSectorText, setActionText, linkHabit } from "../domain/mandala.js";
+import { setSectorText, setActionText, linkHabit, unlinkEverywhere } from "../domain/mandala.js";
 import { newId } from "../utils/id.js";
 
 // ── 액션 타입 ──
@@ -251,6 +251,13 @@ function dataReducer(data, action) {
     case A.DATA_APPLY_REMOTE: return { ...data, ...action.patch };
     case A.CHECK_TOGGLE: return { ...data, checks: toggleCheck(data.checks, action) };
     case A.SETTINGS_SET: return { ...data, settings: { ...data.settings, ...action.patch } };
+    case A.HABIT_DELETE: {
+      const habits = habitsReducer(data.habits, action);
+      if (habits === data.habits) return data;
+      // 만다라트 칸에 남은 링크도 함께 정리
+      const goalTags = Object.fromEntries(Object.entries(data.goalTags).map(([id, tag]) => [id, tag.mandala ? { ...tag, mandala: unlinkEverywhere(tag.mandala, action.id) } : tag]));
+      return { ...data, habits, goalTags };
+    }
     default: {
       const habits = habitsReducer(data.habits, action);
       const todos = todosReducer(data.todos, action);

@@ -259,3 +259,8 @@
 .cell.check.partial{font-size:12px;font-family:var(--font-num);color:var(--ink-2);background:var(--yellow-soft);border-color:var(--yellow)}
 .count-badge{position:absolute;right:3px;bottom:2px;font-size:9px;font-family:var(--font-num);color:var(--accent-dark)}
 .cell.check{position:relative}
+
+.day-cell.partial{background:var(--yellow-soft);color:var(--ink)}
+.wk-cell.partial{color:var(--yellow)}
+.wk-check.partial{background:var(--yellow-soft);border-color:var(--yellow);font-size:10px;font-family:var(--font-num)}
+.mx-cell.q3{background:var(--yellow-soft)}

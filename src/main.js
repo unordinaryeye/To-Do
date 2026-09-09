@@ -35,6 +35,7 @@ store.subscribe((state, prev, action) => {
   if (state.data !== prev.data) {
     saveData(state.data);
     if (action.type !== A.DATA_APPLY_REMOTE) sync.notifyChange();
+    if (state.data.settings.theme !== prev.data.settings.theme) applyTheme(state.data.settings.theme); // 다른 기기에서 바꾼 테마도 반영
   }
   render(state);
 });
@@ -43,16 +44,20 @@ applyTheme(data.settings.theme);
 mountApp({ store, sync });
 startReminders(() => store.getState());
 
-// 앱 셸 캐시. 새 버전이 준비되면 알려주고, 사용자가 원할 때 새로고침하게 둔다.
+// 앱 셸 캐시. 새 워커는 바로 활성화시키고(skipWaiting), 파일은 다음 실행 때 새 것으로 적용된다.
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then((reg) => {
+  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
+    const activate = (worker) => worker?.postMessage("skipWaiting");
+    if (reg.waiting) activate(reg.waiting);
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       worker?.addEventListener("statechange", () => {
-        if (worker.state === "installed" && navigator.serviceWorker.controller) toast("⬆️", "새 버전이 있어요. 앱을 다시 열면 적용돼요");
+        if (worker.state === "installed" && navigator.serviceWorker.controller) activate(worker);
       });
     });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
   }).catch((error) => console.warn("서비스 워커 등록 실패:", error));
+  navigator.serviceWorker.addEventListener("controllerchange", () => toast("⬆️", "새 버전이 준비됐어요. 앱을 다시 열면 적용돼요"));
 }
 if (migrated) toast("✨", "데이터를 새 형식으로 옮겼어요");
 if (syncCode && sync.ready) sync.resume(syncCode);

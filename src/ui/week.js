@@ -3,6 +3,7 @@ import { ISO_DAYS_KR, isoWeekday, fromDateKey, weekOf, todayKey, compareKeys } f
 import { activeHabits, habitsForDate, todosForDate, undoneTodos } from "../state/selectors.js";
 import { isScheduled } from "../domain/schedule.js";
 import { isHabitDone } from "../domain/metrics.js";
+import { checkProgress } from "../state/selectors.js";
 import { priorityBadges } from "../domain/todo.js";
 import { emptyState } from "./parts.js";
 
@@ -22,9 +23,11 @@ export function renderHabitWeek(state) {
       const future = compareKeys(d, today) > 0;
       const scheduled = isScheduled(habit, d) && habitsForDate(state.data, d, filterTagId).some((x) => x.id === habit.id);
       const done = scheduled && isHabitDone(habit, checks, d);
-      const cls = ["wk-check", done && "on", !scheduled && "off", future && "future"].filter(Boolean).join(" ");
+      const { count, target } = checkProgress(state.data, habit, d);
+      const partial = scheduled && !done && count > 0;
+      const cls = ["wk-check", done && "on", partial && "partial", !scheduled && "off", future && "future"].filter(Boolean).join(" ");
       return h("button", { class: cls, dataset: scheduled && !future ? { action: "toggleCheckOn", id: habit.id, date: d } : {}, disabled: !scheduled || future,
-        role: "checkbox", "aria-checked": String(done), "aria-label": `${d} ${habit.name}` }, done ? habit.emoji : scheduled ? "" : "–");
+        role: "checkbox", "aria-checked": String(done), "aria-label": `${d} ${habit.name}` }, done ? habit.emoji : partial ? `${count}/${target}` : scheduled ? "" : "–");
     }),
   ));
   return h("div", { class: "card wk-table home" }, head, rows);

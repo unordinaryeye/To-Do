@@ -2,7 +2,7 @@ import { h } from "../utils/dom.js";
 import { ISO_DAYS_KR, isoWeekday, fromDateKey, weekOf, formatMonthKR, todayKey } from "../utils/date.js";
 import { weeklyStats, greenLightStats, globalStreak } from "../domain/metrics.js";
 
-const CELL_SYMBOL = { done: "■", missed: "□", off: "–", future: "·" };
+const CELL_SYMBOL = { done: "■", partial: "◪", missed: "□", off: "–", future: "·" };
 const GREEN_SYMBOL = { green: "●", partial: "◑", zero: "○", none: "─", future: "" };
 const GREEN_LABEL = { green: "초록불", partial: "일부 달성", zero: "미달성", none: "예정 없음", future: "미래" };
 

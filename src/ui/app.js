@@ -18,7 +18,7 @@ import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 const drafts = {
   todo: "", sync: "",
   habitName: "", triggerText: "", triggerTime: "", startDate: "", endDate: "",
-  todoTitle: "", todoTime: "", todoDate: "", tagName: "", mandalaText: "",
+  todoTitle: "", todoTime: "", todoDate: "", tagName: "", mandalaText: "", reminderTime: "",
 };
 
 const SCREENS = { home: renderHome, stats: renderStats, goals: renderGoals, settings: renderSettings };

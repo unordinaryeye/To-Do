@@ -42,15 +42,32 @@ export function normalizeMandala(mandala) {
 
 const replaceAt = (arr, index, value) => arr.map((item, i) => (i === index ? value : item));
 
+/** 저장용 압축: 빈 실천항목/세부목표는 null, 전부 비면 null. normalizeMandala가 다시 펼친다. */
+export function compactMandala(mandala) {
+  const m = normalizeMandala(mandala);
+  const sectors = m.sectors.map((s) => {
+    const actions = s.actions.map((a) => (a.text.trim() || a.habitIds.length ? a : null));
+    return s.text.trim() || actions.some(Boolean) ? { text: s.text, actions } : null;
+  });
+  return sectors.some(Boolean) ? { sectors } : null;
+}
+
+/** 삭제된 습관 id를 모든 칸에서 제거 */
+export function unlinkEverywhere(mandala, habitId) {
+  if (!mandala) return mandala;
+  const m = normalizeMandala(mandala);
+  return compactMandala({ sectors: m.sectors.map((s) => ({ ...s, actions: s.actions.map((a) => ({ ...a, habitIds: a.habitIds.filter((id) => id !== habitId) })) })) });
+}
+
 export function setSectorText(mandala, sector, text) {
   const m = normalizeMandala(mandala);
-  return { sectors: replaceAt(m.sectors, sector, { ...m.sectors[sector], text }) };
+  return compactMandala({ sectors: replaceAt(m.sectors, sector, { ...m.sectors[sector], text }) });
 }
 
 export function setActionText(mandala, sector, action, text) {
   const m = normalizeMandala(mandala);
   const s = m.sectors[sector];
-  return { sectors: replaceAt(m.sectors, sector, { ...s, actions: replaceAt(s.actions, action, { ...s.actions[action], text }) }) };
+  return compactMandala({ sectors: replaceAt(m.sectors, sector, { ...s, actions: replaceAt(s.actions, action, { ...s.actions[action], text }) }) });
 }
 
 export function linkHabit(mandala, sector, action, habitId, on) {
@@ -58,7 +75,7 @@ export function linkHabit(mandala, sector, action, habitId, on) {
   const s = m.sectors[sector];
   const a = s.actions[action];
   const habitIds = on ? [...new Set([...a.habitIds, habitId])] : a.habitIds.filter((id) => id !== habitId);
-  return { sectors: replaceAt(m.sectors, sector, { ...s, actions: replaceAt(s.actions, action, { ...a, habitIds }) }) };
+  return compactMandala({ sectors: replaceAt(m.sectors, sector, { ...s, actions: replaceAt(s.actions, action, { ...a, habitIds }) }) });
 }
 
 /** 습관 id → 연결된 칸 위치 목록 [{ tagId, sector, action }] */

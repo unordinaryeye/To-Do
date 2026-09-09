@@ -15,7 +15,7 @@ const DAY_ORDER = [1, 2, 3, 4, 5, 6, 7];
 export function initHabitDrafts(drafts, values) {
   Object.assign(drafts, {
     habitName: values.name, triggerText: values.triggerText, triggerTime: values.triggerTime,
-    startDate: values.startDate, endDate: values.endDate,
+    startDate: values.startDate, endDate: values.endDate, reminderTime: values.reminderTime || "",
   });
 }
 
@@ -36,6 +36,7 @@ export function habitFormError(values, drafts, today, { requireName = true } = {
   }
   if (values.triggerType === "time" && !isValidTime(drafts.triggerTime)) return "시간을 입력해 주세요";
   if (values.triggerType === "context" && !drafts.triggerText.trim()) return "상황을 입력해 주세요";
+  if (requireName && values.reminderOn && !isValidTime(drafts.reminderTime)) return "알림 시간을 입력해 주세요";
   return null;
 }
 
@@ -119,7 +120,6 @@ export function renderHabitForm(state, drafts) {
 
 function extrasSection(values, drafts) {
   const target = values.targetCount || 1;
-  const timeHint = drafts.triggerTime ? `${drafts.triggerTime}에 알림` : "시간을 정하면 그 시간에";
   return h("div", { class: "form-group" },
     h("div", { class: "form-row" },
       h("span", { class: "k" }, "✔ 하루 달성 수"),
@@ -130,9 +130,13 @@ function extrasSection(values, drafts) {
       ),
     ),
     h("div", { class: "form-row" },
-      h("span", { class: "k" }, "🔔 알림", h("span", { class: "hint", style: { display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: "400" } }, values.reminderOn ? `${timeHint} · 앱이 열려 있을 때` : "앱이 열려 있을 때 알려드려요")),
+      h("span", { class: "k" }, "🔔 알림", h("span", { class: "hint", style: { display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: "400" } }, "앱이 열려 있을 때 알려드려요")),
       h("button", { class: `switch${values.reminderOn ? " on" : ""}`, dataset: { action: "formToggleReminder" }, role: "switch", "aria-checked": String(!!values.reminderOn) }, h("span", { class: "knob" })),
     ),
+    values.reminderOn ? h("div", { class: "form-row" },
+      h("span", { class: "k" }, "알림 시간"),
+      h("span", { class: "v" }, h("input", { type: "time", id: "reminderTimeField", value: drafts.reminderTime, dataset: { draft: "reminderTime" }, "aria-label": "알림 시간" })),
+    ) : null,
   );
 }
 

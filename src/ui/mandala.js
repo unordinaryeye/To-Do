@@ -54,7 +54,7 @@ function zoom(state, tag, mandala, progress, sectorIndex) {
   sector.actions.forEach((action, j) => {
     const text = action.text.trim();
     const pct = progress.sectors[sectorIndex].actions[j];
-    const linked = action.habitIds.length;
+    const linked = action.habitIds.filter((id) => state.data.habits[id]).length;
     cells[SLOT_TO_CELL[j]] = cell(text || "+", {
       empty: !text, pct, sub: linked ? `🔗${linked}${pct != null ? ` · ${pct}%` : ""}` : null,
       dataset: { action: "openMandalaCell", tagId: tag.id, sector: String(sectorIndex), cell: String(j) },

@@ -19,8 +19,8 @@ import { toast } from "./toast.js";
 /** data-action 이름 → 핸들러(el, event). drafts는 입력 중인 텍스트·날짜·시간(비제어). */
 export function applyTheme(theme) {
   const root = document.documentElement;
-  if (theme === "light" || theme === "dark") root.dataset.theme = theme;
-  else delete root.dataset.theme;
+  if (theme === "light" || theme === "dark") { root.dataset.theme = theme; root.style.colorScheme = theme; }
+  else { delete root.dataset.theme; root.style.colorScheme = ""; }
 }
 
 export function createActions({ store, sync, drafts }) {
@@ -96,14 +96,19 @@ export function createActions({ store, sync, drafts }) {
     return null;
   }
 
-  function habitPayload(values, name, emoji) {
-    return {
+  /** 폼 → HABIT_UPSERT. 빠른 설정 시트(withExtras=false)는 알림·태그·달성 수를 건드리지 않는다. */
+  function habitPayload(values, name, emoji, { withExtras = true } = {}) {
+    const base = {
       type: A.HABIT_UPSERT, id: values.id, name, emoji,
       startDate: drafts.startDate, endDate: drafts.endDate || null,
       repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
       goalTagIds: values.goalTagIds, showInTodo: values.showInTodo,
+    };
+    if (!withExtras) return base;
+    return {
+      ...base,
       targetCount: values.targetCount,
-      reminder: values.reminderOn ? { enabled: true, time: drafts.triggerTime || null } : null,
+      reminder: values.reminderOn ? { enabled: true, time: drafts.reminderTime } : null,
     };
   }
 
@@ -161,14 +166,17 @@ export function createActions({ store, sync, drafts }) {
       const next = Math.min(MAX_TARGET_COUNT, Math.max(1, (formValues().targetCount || 1) + Number(el.dataset.n)));
       patchForm({ targetCount: next });
     },
-    formToggleReminder: async () => {
+    formToggleReminder: () => {
       const v = formValues();
-      if (!v.reminderOn) {
-        const perm = await requestNotificationPermission();
-        if (perm === "denied") toast("ℹ️", "시스템 알림은 꺼져 있어요. 앱을 열어 두면 토스트로 알려드려요");
-        if (v.triggerType !== "time" && !drafts.triggerTime) toast("ℹ️", "알림 시간은 '시간' 항목의 값을 써요");
+      const turningOn = !v.reminderOn;
+      if (turningOn) {
+        // 권한 요청은 사용자 탭 안에서(await 전에) 호출해야 iOS/Safari가 받아준다
+        requestNotificationPermission().then((perm) => {
+          if (perm === "denied") toast("ℹ️", "시스템 알림은 꺼져 있어요. 앱을 열어 두면 토스트로 알려드려요");
+        });
+        if (!drafts.reminderTime) drafts.reminderTime = drafts.triggerTime || "09:00";
       }
-      patchForm({ reminderOn: !v.reminderOn });
+      patchForm({ reminderOn: turningOn });
     },
     formSuggest: (el) => {
       const item = SUGGESTED_HABITS[Number(el.dataset.i)];
@@ -218,7 +226,7 @@ export function createActions({ store, sync, drafts }) {
       const habit = values && getState().data.habits[values.id];
       const error = habit && habitFormError(values, drafts, todayKey(), { requireName: false });
       if (!habit || error) { toast("⚠️", error || "입력을 확인해 주세요"); return; }
-      dispatch(habitPayload(values, habit.name, habit.emoji));
+      dispatch(habitPayload(values, habit.name, habit.emoji, { withExtras: false }));
       ui({ sheet: null });
       toast("✅", drafts.startDate > todayKey() ? "시작 날짜부터 적용돼요" : "오늘부터 적용돼요");
     },
@@ -380,7 +388,12 @@ export function createActions({ store, sync, drafts }) {
       ui({ sheet: null });
       toast("✅", "저장했어요");
     },
-    openMandalaLink: (el) => ui({ sheet: { type: "mandalaLink", ...mandalaCellOf(el) } }),
+    openMandalaLink: (el) => {
+      const c = mandalaCellOf(el);
+      const text = drafts.mandalaText.trim();
+      if (text !== mandalaText(c.tagId, c.sector, c.cell)) dispatch({ type: A.MANDALA_ACTION, tagId: c.tagId, sector: c.sector, action: c.cell, text }); // 입력 중 텍스트 보존
+      ui({ sheet: { type: "mandalaLink", ...c } });
+    },
     toggleMandalaLink: (el) => dispatch({ type: A.MANDALA_LINK, tagId: el.dataset.tagId, sector: Number(el.dataset.sector), action: Number(el.dataset.cell), habitId: el.dataset.habitId, on: el.dataset.on === "1" }),
     unlinkMandalaHabit: (el) => dispatch({ type: A.MANDALA_LINK, tagId: el.dataset.tagId, sector: Number(el.dataset.sector), action: Number(el.dataset.cell), habitId: el.dataset.habitId, on: false }),
     /** 실천항목 → 습관 폼(이름·태그 프리필). 저장 시 새 습관을 이 칸에 연결한다. */

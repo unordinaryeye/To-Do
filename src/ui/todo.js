@@ -1,6 +1,6 @@
 import { h } from "../utils/dom.js";
 import { todayKey, formatDateDots } from "../utils/date.js";
-import { todosForDate, quadrantGroups, overdueTodos, habitsInTodo } from "../state/selectors.js";
+import { todosForDate, quadrantGroups, overdueTodos, habitsInTodo, checkProgress } from "../state/selectors.js";
 import { QUADRANTS, priorityBadges } from "../domain/todo.js";
 import { currentPolicy } from "../domain/schedule.js";
 import { isHabitDone } from "../domain/metrics.js";
@@ -89,8 +89,10 @@ function habitRows(state) {
   return habitsInTodo(state.data, selectedDate).map((habit) => {
     const done = isHabitDone(habit, checks, selectedDate);
     const policy = currentPolicy(habit, selectedDate);
+    const { count, target } = checkProgress(state.data, habit, selectedDate);
+    const partial = !done && count > 0;
     return h("div", { class: "row todo-row habit-in-todo" },
-      h("div", { class: `cell check${done ? " on check-pop" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": habit.name }, done ? habit.emoji : ""),
+      h("div", { class: `cell check${done ? " on check-pop" : ""}${partial ? " partial" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": habit.name }, done ? habit.emoji : partial ? `${count}/${target}` : ""),
       h("div", { class: "cell when" }, h("span", { class: "t ctx" }, triggerLabel(policy?.trigger, settings.clock24))),
       h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
         h("span", { class: "rank" }, "🔁"), h("span", { class: `txt${done ? " done" : ""}` }, `${habit.emoji} ${habit.name}`)),

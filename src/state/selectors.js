@@ -120,6 +120,7 @@ export function habitFormValues(data, id, todayKey) {
     showInTodo: !!habit?.showInTodo,
     targetCount: policy?.targetCount ?? 1,
     reminderOn: !!habit?.reminder?.enabled,
+    reminderTime: habit?.reminder?.time ?? "",
   };
 }
 

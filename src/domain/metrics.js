@@ -87,10 +87,12 @@ export function habitStreak(habit, checks, anchorKey) {
   return streak;
 }
 
+/** 'done' | 'partial'(일부 횟수) | 'missed' | 'off' | 'future' */
 function cellState(habit, checks, day, todayKey) {
   if (!isScheduled(habit, day)) return "off";
   if (compareKeys(day, todayKey) > 0) return "future";
-  return isHabitDone(habit, checks, day) ? "done" : "missed";
+  if (isHabitDone(habit, checks, day)) return "done";
+  return checkCount(checks, day, habit.id) > 0 ? "partial" : "missed";
 }
 
 /**
@@ -110,7 +112,7 @@ export function monthlyStats(habits, checks, month, todayKey) {
         const state = cellState(habit, checks, day, todayKey);
         cells[day] = state;
         if (state === "done") { scheduled++; done++; }
-        else if (state === "missed") scheduled++;
+        else if (state === "missed" || state === "partial") scheduled++;
       }
       return { habit, cells, scheduled, done, pct: scheduled ? Math.round((done / scheduled) * 100) : null };
     })
@@ -147,7 +149,7 @@ export function weeklyStats(habits, checks, days, todayKey) {
     .sort((a, b) => a.order - b.order)
     .map((habit) => {
       const cells = Object.fromEntries(days.map((day) => [day, cellState(habit, checks, day, todayKey)]));
-      const scheduled = Object.values(cells).filter((c) => c === "done" || c === "missed").length;
+      const scheduled = Object.values(cells).filter((c) => c === "done" || c === "missed" || c === "partial").length;
       const done = Object.values(cells).filter((c) => c === "done").length;
       return { habit, cells, scheduled, done };
     })
