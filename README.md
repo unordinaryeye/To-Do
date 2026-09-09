@@ -2,7 +2,7 @@
 
 매일 반복하는 루틴과 하루짜리 할 일을 한 화면에서 관리하는 개인용 웹앱입니다. 아이폰 홈 화면에 추가하면 앱처럼 씁니다. 서버 없이 정적 파일로 동작하고, 기록은 기기(localStorage)에 저장되며 원하면 Firebase로 기기 간 동기화합니다.
 
-- 주소: https://unordinaryeye.github.io/To-Do/
+- 주소: **https://myroutine.web.app** (예전 주소 https://unordinaryeye.github.io/To-Do/ 도 계속 동작)
 - 빌드 없음. `index.html` + `src/` ES module + `styles/` 그대로 배포.
 
 ---
