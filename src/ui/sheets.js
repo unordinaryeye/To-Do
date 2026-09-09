@@ -78,6 +78,17 @@ function quadrantPicker(state, id) {
   ], { title: todo.title, sub: "긴급·중요 여부로 사분면을 고릅니다" });
 }
 
+function tagActions(state, id) {
+  const tag = state.data.goalTags[id];
+  if (!tag) return null;
+  return sheet([
+    h("div", { class: "sheet-summary" }, h("span", { class: "emoji" }, tag.emoji), h("div", null, h("div", { class: "name" }, tag.name))),
+    actionItem("수정하기", "✏️", { action: "openTagForm", id }),
+    actionItem("삭제하기", "🗑", { action: "askDeleteTag", id }, { danger: true }),
+    h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
+  ]);
+}
+
 function fabMenu(state) {
   const item = (label, sub, icon, dataset) => h("div", { class: "fab-item", dataset },
     h("div", null, h("div", { class: "lbl" }, label), h("div", { class: "sub" }, sub)),
@@ -115,6 +126,11 @@ export function renderSheet(state, drafts) {
     case "schedule": return scheduleSheet(state, drafts);
     case "emoji": return sheet([emojiGrid(state.ui.page?.values.emoji)], { title: "이모지 선택" });
     case "quadrant": return quadrantPicker(state, s.id);
+    case "tagActions": return tagActions(state, s.id);
+    case "confirmDeleteTag": {
+      const name = state.data.goalTags[s.id]?.name ?? "";
+      return confirmBox([`"${name}" 목표를 삭제할까요?`, h("br"), "습관은 남고 이 태그만 사라져요."], "삭제", { action: "deleteTag", id: s.id });
+    }
     case "fab": return fabMenu(state);
     case "ended": return endedSheet(state);
     case "confirmEndHabit": {

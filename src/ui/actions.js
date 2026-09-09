@@ -1,14 +1,15 @@
 import { addDays, addMonths, todayKey, isValidDateKey, isValidTime } from "../utils/date.js";
 import { A } from "../state/reducers.js";
-import { randomCode } from "../utils/id.js";
+import { randomCode, newId } from "../utils/id.js";
 import { focusById } from "../utils/dom.js";
 import { setSyncCode, setLastBackup, clearLastBackup } from "../storage/local.js";
 import { downloadBackup } from "../storage/backup.js";
 import { defaultData } from "../domain/migrate.js";
 import { REPEAT_PRESETS } from "../domain/format.js";
-import { habitFormValues, todoFormValues } from "../state/selectors.js";
+import { habitFormValues, todoFormValues, tagFormValues } from "../state/selectors.js";
+import { TAG_COLORS } from "../config.js";
 import { parseTodoInput, quadrantById } from "../domain/todo.js";
-import { habitFormError, initHabitDrafts, initTodoDrafts } from "./forms.js";
+import { habitFormError, initHabitDrafts, initTodoDrafts, initTagDrafts } from "./forms.js";
 import { toast } from "./toast.js";
 
 /** data-action 이름 → 핸들러(el, event). drafts는 입력 중인 텍스트·날짜·시간(비제어). */
@@ -78,8 +79,50 @@ export function createActions({ store, sync, drafts }) {
       type: A.HABIT_UPSERT, id: values.id, name, emoji,
       startDate: drafts.startDate, endDate: drafts.endDate || null,
       repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
+      goalTagIds: values.goalTagIds,
     };
   }
+
+  const tags = {
+    formToggleTag: (el) => {
+      const ids = formValues().goalTagIds || [];
+      const id = el.dataset.id;
+      patchForm({ goalTagIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] });
+    },
+    formColor: (el) => patchForm({ color: el.dataset.color }),
+    openTagActions: (el) => ui({ sheet: { type: "tagActions", id: el.dataset.id } }),
+    openTagForm: (el) => {
+      const used = Object.values(getState().data.goalTags).length;
+      const values = tagFormValues(getState().data, el?.dataset.id || null, TAG_COLORS[used % TAG_COLORS.length]);
+      initTagDrafts(drafts, values);
+      // 습관 폼에서 열었으면 돌아갈 수 있게 이전 페이지를 기억한다
+      const returnTo = el?.dataset.from === "habit" ? getState().ui.page : null;
+      ui({ sheet: null, page: { type: "tagForm", values, returnTo } });
+      focusById("tagNameField");
+    },
+    submitTagForm: () => {
+      const page = getState().ui.page;
+      const name = drafts.tagName.trim();
+      if (!page?.values || !name) { toast("⚠️", "목표 이름을 입력해 주세요"); return; }
+      const id = page.values.id || newId("g");
+      dispatch({ type: A.TAG_UPSERT, id, name, emoji: page.values.emoji, color: page.values.color });
+      if (page.returnTo) {
+        const prev = page.returnTo;
+        const ids = prev.values.goalTagIds || [];
+        ui({ page: { ...prev, values: { ...prev.values, goalTagIds: ids.includes(id) ? ids : [...ids, id] } } });
+      } else {
+        ui({ page: null });
+      }
+      toast("✅", page.values.id ? "목표를 저장했어요" : "목표를 만들었어요");
+    },
+    askDeleteTag: (el) => ui({ sheet: { type: "confirmDeleteTag", id: el.dataset.id } }),
+    deleteTag: (el) => {
+      dispatch({ type: A.TAG_DELETE, id: el.dataset.id });
+      if (getState().ui.filterTagId === el.dataset.id) ui({ filterTagId: null });
+      closeAll();
+      toast("🗑", "목표를 삭제했어요");
+    },
+  };
 
   const habits = {
     toggleCheck: (el) => dispatch({ type: A.CHECK_TOGGLE, date: selected(), habitId: el.dataset.id }),
@@ -218,5 +261,5 @@ export function createActions({ store, sync, drafts }) {
     },
   };
 
-  return { ...navigation, ...form, ...habits, ...todos, ...data, ...syncActions };
+  return { ...navigation, ...form, ...tags, ...habits, ...todos, ...data, ...syncActions };
 }

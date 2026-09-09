@@ -8,7 +8,7 @@ import { renderHome } from "./home.js";
 import { renderStats } from "./stats.js";
 import { renderGoals } from "./goals.js";
 import { renderSettings } from "./settings.js";
-import { renderHabitForm, renderTodoForm } from "./forms.js";
+import { renderHabitForm, renderTodoForm, renderTagForm } from "./forms.js";
 import { renderSheet } from "./sheets.js";
 import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 
@@ -16,11 +16,11 @@ import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 const drafts = {
   todo: "", sync: "",
   habitName: "", triggerText: "", triggerTime: "", startDate: "", endDate: "",
-  todoTitle: "", todoTime: "", todoDate: "",
+  todoTitle: "", todoTime: "", todoDate: "", tagName: "",
 };
 
 const SCREENS = { home: renderHome, stats: renderStats, goals: renderGoals, settings: renderSettings };
-const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm };
+const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm };
 const IME_KEYCODE = 229;
 
 let layerWasOpen = false;

@@ -16,6 +16,8 @@ export const A = {
   TODO_TOGGLE: "todo/toggle",
   TODO_DELETE: "todo/delete",
   TODO_MOVE: "todo/move",
+  TAG_UPSERT: "tag/upsert",
+  TAG_DELETE: "tag/delete",
   SETTINGS_SET: "settings/set",
   DATA_REPLACE: "data/replace",
   DATA_APPLY_REMOTE: "data/applyRemote",
@@ -51,7 +53,7 @@ function toggleCheck(checks, { date, habitId }) {
  * 시작일을 앞당기면 첫 정책도 같이 앞당겨 공백이 생기지 않게 한다.
  */
 function upsertHabit(habits, action) {
-  const { id, name, emoji, startDate, endDate, repeatDays, trigger, today } = action;
+  const { id, name, emoji, startDate, endDate, repeatDays, trigger, today, goalTagIds } = action;
   const existing = id ? habits[id] : null;
   const habitId = existing ? id : newId("h");
   const effectiveFrom = existing ? (compareKeys(startDate, today) > 0 ? startDate : today) : startDate;
@@ -59,7 +61,7 @@ function upsertHabit(habits, action) {
   const policy = makePolicy(effectiveFrom, {
     repeat: { days: [...repeatDays].sort((a, b) => a - b) },
     trigger: trigger?.type ? { type: trigger.type, value: trigger.value } : null,
-    goalTagIds: base?.goalTagIds ?? [],
+    goalTagIds: goalTagIds ?? base?.goalTagIds ?? [],
     targetCount: base?.targetCount ?? 1,
   });
   const habit = {
@@ -140,8 +142,25 @@ function todosReducer(todos, action) {
   }
 }
 
+function tagsReducer(goalTags, action) {
+  switch (action.type) {
+    case A.TAG_UPSERT: {
+      const id = action.id || newId("g");
+      const existing = goalTags[id] || { id, archived: false, mandala: null };
+      return { ...goalTags, [id]: { ...existing, name: action.name, emoji: action.emoji, color: action.color } };
+    }
+    case A.TAG_DELETE: {
+      const tag = goalTags[action.id];
+      return tag ? { ...goalTags, [action.id]: { ...tag, archived: true } } : goalTags;
+    }
+    default: return goalTags;
+  }
+}
+
 function dataReducer(data, action) {
   switch (action.type) {
+    case A.TAG_UPSERT:
+    case A.TAG_DELETE: return { ...data, goalTags: tagsReducer(data.goalTags, action) };
     case A.DATA_REPLACE: return action.data;
     case A.DATA_APPLY_REMOTE: return { ...data, ...action.patch };
     case A.CHECK_TOGGLE: return { ...data, checks: toggleCheck(data.checks, action) };

@@ -1,4 +1,5 @@
-import { EMOJI_OPTIONS } from "../config.js";
+import { EMOJI_OPTIONS, TAG_COLORS } from "../config.js";
+import { activeTags } from "../state/selectors.js";
 import { h } from "../utils/dom.js";
 import { ISO_DAYS_KR, isValidDateKey, isValidTime, compareKeys } from "../utils/date.js";
 import { REPEAT_PRESETS, TRIGGER_SUGGESTIONS, repeatLabel } from "../domain/format.js";
@@ -100,7 +101,44 @@ export function renderHabitForm(state, drafts) {
       h("input", { id: "habitNameField", value: drafts.habitName, placeholder: "루틴 입력", maxlength: "30", dataset: { draft: "habitName" }, "aria-label": "루틴 이름" }),
     ),
     scheduleEditor(values, drafts),
+    tagSection(state, values),
     editing ? h("button", { class: "btn danger-ghost block big", dataset: { action: "askDeleteHabit", id: values.id } }, "삭제") : null,
+  );
+}
+
+function tagSection(state, values) {
+  const tags = activeTags(state.data);
+  return h("div", { class: "form-group" },
+    h("div", { class: "form-section" },
+      h("div", { class: "k" }, "🏷 목표 태그", h("span", { class: "hint" }, values.goalTagIds.length ? `${values.goalTagIds.length}개 선택` : "선택 안 함")),
+      h("div", { class: "chips" },
+        tags.map((tag) => chip(`${tag.emoji} ${tag.name}`, { on: values.goalTagIds.includes(tag.id), small: true, dataset: { action: "formToggleTag", id: tag.id } })),
+        chip("+ 새 목표", { small: true, dataset: { action: "openTagForm", from: "habit" } }),
+      ),
+    ),
+  );
+}
+
+export function initTagDrafts(drafts, values) {
+  drafts.tagName = values.name;
+}
+
+export function renderTagForm(state, drafts) {
+  const values = state.ui.page.values;
+  const editing = !!values.id;
+  return page(editing ? "목표 수정" : "목표 추가", { confirmLabel: "확인", confirmDataset: { action: "submitTagForm" } },
+    h("div", { class: "form-name" },
+      h("button", { class: "emoji-btn", dataset: { action: "openEmojiSheet" }, "aria-label": "이모지 선택" }, values.emoji),
+      h("input", { id: "tagNameField", value: drafts.tagName, placeholder: "목표 이름 (예: 건강 챙기기)", maxlength: "20", dataset: { draft: "tagName" }, "aria-label": "목표 이름" }),
+    ),
+    h("div", { class: "form-group" },
+      h("div", { class: "form-section" },
+        h("div", { class: "k" }, "색상"),
+        h("div", { class: "color-row" }, TAG_COLORS.map((c) =>
+          h("button", { class: `color-dot${values.color === c ? " on" : ""}`, style: { background: c }, dataset: { action: "formColor", color: c }, "aria-label": c }))),
+      ),
+    ),
+    editing ? h("button", { class: "btn danger-ghost block big", dataset: { action: "askDeleteTag", id: values.id } }, "삭제") : null,
   );
 }
 

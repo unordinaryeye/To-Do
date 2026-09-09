@@ -77,7 +77,17 @@ export function habitFormValues(data, id, todayKey) {
     triggerType: policy?.trigger?.type ?? "none",
     triggerTime: policy?.trigger?.type === "time" ? policy.trigger.value : "",
     triggerText: policy?.trigger?.type === "context" ? policy.trigger.value : "",
+    goalTagIds: policy?.goalTagIds ?? [],
   };
+}
+
+export function activeTags(data) {
+  return Object.values(data.goalTags).filter((tag) => !tag.archived);
+}
+
+export function tagFormValues(data, id, fallbackColor) {
+  const tag = id ? data.goalTags[id] : null;
+  return { id: tag?.id ?? null, name: tag?.name ?? "", emoji: tag?.emoji ?? "🎯", color: tag?.color ?? fallbackColor };
 }
 
 export function todoFormValues(data, id, dateKey) {

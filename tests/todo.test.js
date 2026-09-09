@@ -78,3 +78,23 @@ suite("todo: 우선순위 리듀서와 셀렉터", (test) => {
     assertDeepEqual(todosForDate(state.data, TODAY).map((x) => x.title), ["c", "b", "a"]);
   });
 });
+
+suite("goalTags: 리듀서", (test) => {
+  const fresh = () => ({ data: defaultData(TODAY), ui: initialUi({ today: TODAY, syncCode: "", firebaseReady: false }) });
+  test("태그 추가/수정/삭제(보관)", () => {
+    let state = rootReducer(fresh(), { type: A.TAG_UPSERT, id: "gx", name: "시험", emoji: "📚", color: "#000" });
+    assertEqual(state.data.goalTags.gx.name, "시험");
+    assertEqual(state.data.goalTags.gx.archived, false);
+    state = rootReducer(state, { type: A.TAG_UPSERT, id: "gx", name: "시험 합격", emoji: "🔥", color: "#111" });
+    assertEqual(state.data.goalTags.gx.name, "시험 합격");
+    state = rootReducer(state, { type: A.TAG_DELETE, id: "gx" });
+    assertEqual(state.data.goalTags.gx.archived, true);
+  });
+  test("습관 upsert에 goalTagIds를 주면 새 정책에 반영, 안 주면 유지", () => {
+    const base = { type: A.HABIT_UPSERT, id: "r1", name: "물", emoji: "💧", startDate: "2000-01-01", endDate: null, repeatDays: [1, 2, 3, 4, 5, 6, 7], trigger: null, today: TODAY };
+    let state = rootReducer(fresh(), { ...base, goalTagIds: ["health", "morning"] });
+    assertDeepEqual(state.data.habits.r1.policies.at(-1).goalTagIds, ["health", "morning"]);
+    state = rootReducer(state, { ...base, repeatDays: [1] });
+    assertDeepEqual(state.data.habits.r1.policies.at(-1).goalTagIds, ["health", "morning"]);
+  });
+});
