@@ -1,6 +1,9 @@
 import { h } from "../utils/dom.js";
 import { todayKey } from "../utils/date.js";
-import { todosForDate, quadrantGroups } from "../state/selectors.js";
+import { todosForDate, quadrantGroups, undoneTodos } from "../state/selectors.js";
+import { addDays, formatDateDots } from "../utils/date.js";
+import { renderTodoWeek } from "./week.js";
+import { chip } from "./parts.js";
 import { QUADRANTS, priorityBadges } from "../domain/todo.js";
 import { emptyState } from "./parts.js";
 
@@ -67,19 +70,41 @@ function matrixView(state, groups) {
   );
 }
 
-export function renderTodosTab(state, drafts) {
+/** 어제 못 끝낸 일이 있으면 오늘 목록 위에 옮기기 배너 */
+function carryBanner(state) {
   const { selectedDate } = state.ui;
+  if (selectedDate !== todayKey()) return null;
+  const yesterday = addDays(selectedDate, -1);
+  const count = undoneTodos(state.data, yesterday).length;
+  if (!count) return null;
+  return h("div", { class: "carry-banner", dataset: { action: "carryOver", from: yesterday, to: selectedDate }, role: "button", tabindex: "0" },
+    h("span", null, `어제 못 끝낸 일 ${count}개`), h("span", { class: "carry-cta" }, "오늘로 옮기기 ›"));
+}
+
+function body(state, drafts) {
+  const { selectedDate, homeRange } = state.ui;
+  if (homeRange === "week") return renderTodoWeek(state);
   const view = state.data.settings.todoView === "matrix" ? "matrix" : "list";
-  const todos = todosForDate(state.data, selectedDate);
   const now = new Date().toTimeString().slice(0, 5);
-  const toggle = (id, icon, label) => h("button", { class: `view-btn${view === id ? " on" : ""}`, dataset: { action: "setTodoView", view: id }, "aria-label": label, "aria-pressed": String(view === id) }, icon);
+  return view === "matrix"
+    ? matrixView(state, quadrantGroups(state.data, selectedDate))
+    : listView(state, todosForDate(state.data, selectedDate), now);
+}
+
+export function renderTodosTab(state, drafts) {
+  const { selectedDate, homeRange } = state.ui;
+  const view = state.data.settings.todoView === "matrix" ? "matrix" : "list";
+  const toggle = (id, icon, label) => h("button", { class: `view-btn${view === id ? " on" : ""}`, dataset: { action: "setTodoView", view: id }, "aria-label": label, "aria-pressed": String(view === id), disabled: homeRange === "week" }, icon);
   return h("div", null,
     h("div", { class: "filter-row" },
-      h("span", { class: "chip dark" }, "하루"),
+      chip(homeRange === "week" ? "주 ▾" : "하루 ▾", { dark: true, dataset: { action: "toggleHomeRange" } }),
       h("span", { class: "spacer" }),
       h("div", { class: "view-toggle" }, toggle("list", "☰", "리스트 보기"), toggle("matrix", "⊞", "매트릭스 보기")),
+      h("label", { class: "view-btn date-pick", "aria-label": "날짜 선택", title: formatDateDots(selectedDate) }, "📅",
+        h("input", { type: "date", value: selectedDate, dataset: { action: "pickDate" }, "aria-label": "날짜 선택" })),
     ),
-    view === "matrix" ? matrixView(state, quadrantGroups(state.data, selectedDate)) : listView(state, todos, now),
+    carryBanner(state),
+    body(state, drafts),
     h("div", { class: "quick-add" },
       h("input", { id: "todoInputField", value: drafts.todo, placeholder: "할 일 빠른 추가 (예: 14:00 병원)", maxlength: "60", dataset: { draft: "todo", enter: "quickAddTodo" }, "aria-label": "할 일 빠른 추가" }),
       h("button", { class: "btn dark", dataset: { action: "quickAddTodo" } }, "추가"),

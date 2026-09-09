@@ -6,6 +6,7 @@ import { currentPolicy } from "../domain/schedule.js";
 import { repeatLabel, triggerLabel } from "../domain/format.js";
 import { needsBackupReminder } from "../storage/local.js";
 import { chip, emptyState } from "./parts.js";
+import { renderHabitWeek } from "./week.js";
 import { renderTodosTab } from "./todo.js";
 
 const SWIPE_MIN_PX = 40;
@@ -74,7 +75,7 @@ function segment(tab) {
 function filterRow(state) {
   const tags = tagsInUse(state.data, todayKey());
   return h("div", { class: "filter-row" },
-    h("span", { class: "chip dark" }, "하루"),
+    chip(state.ui.homeRange === "week" ? "주 ▾" : "하루 ▾", { dark: true, dataset: { action: "toggleHomeRange" } }),
     tags.map((tag) => chip(`${tag.emoji} ${tag.name}`, {
       on: state.ui.filterTagId === tag.id,
       dataset: { action: "toggleFilterTag", id: tag.id },
@@ -152,7 +153,7 @@ export function renderHome(state, drafts) {
     segment(tab),
     h("div", { class: "home-body" },
       tab === "habits" ? filterRow(state) : null,
-      tab === "habits" ? habitsTab(state) : renderTodosTab(state, drafts),
+      tab === "habits" ? (state.ui.homeRange === "week" ? renderHabitWeek(state) : habitsTab(state)) : renderTodosTab(state, drafts),
       completeBanner(state),
     ),
     h("button", { class: "fab", dataset: { action: "openFab" }, "aria-label": "추가" }, "+"),

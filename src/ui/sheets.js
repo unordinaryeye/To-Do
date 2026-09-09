@@ -49,6 +49,7 @@ function todoActions(state, id) {
       todo.time ? h("div", { class: "meta" }, "시간이 있는 할 일은 시간순으로 정렬돼요") : null)),
     actionItem("수정하기", "✏️", { action: "openTodoForm", id }),
     actionItem(`사분면 이동 · ${quadrantOf(todo)?.label ?? "미분류"}`, "⊞", { action: "openQuadrantPicker", id }),
+    actionItem("습관으로 만들기", "🔁", { action: "openHabitForm", fromTodo: id }),
     actionItem("위로 이동", "▲", { action: "moveTodo", id, dir: "-1" }, { disabled: !bounds.up }),
     actionItem("아래로 이동", "▼", { action: "moveTodo", id, dir: "1" }, { disabled: !bounds.down }),
     actionItem("삭제하기", "🗑", { action: "askDeleteTodo", id }, { danger: true }),

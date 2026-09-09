@@ -74,7 +74,7 @@ function bindEvents(actions) {
   document.body.addEventListener("change", (event) => {
     const target = event.target;
     if (target.dataset.draft) drafts[target.dataset.draft] = target.value; // date/time 피커는 change로만 값을 준다
-    else if (target.tagName === "SELECT" && target.dataset.action) run(target, event);
+    else if (target.dataset.action && (target.tagName === "SELECT" || target.type === "date")) run(target, event);
   });
   document.body.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.isComposing || event.keyCode === IME_KEYCODE) return;

@@ -129,9 +129,19 @@ export function createActions({ store, sync, drafts }) {
 
   const habits = {
     toggleCheck: (el) => dispatch({ type: A.CHECK_TOGGLE, date: selected(), habitId: el.dataset.id }),
+    toggleCheckOn: (el) => dispatch({ type: A.CHECK_TOGGLE, date: el.dataset.date, habitId: el.dataset.id }),
+    toggleHomeRange: () => ui({ homeRange: getState().ui.homeRange === "week" ? "day" : "week" }),
+    selectDateDay: (el) => ui({ selectedDate: el.dataset.date, homeRange: "day" }),
+    pickDate: (el) => { if (isValidDateKey(el.value)) ui({ selectedDate: el.value, homeRange: "day" }); },
+    carryOver: (el) => {
+      dispatch({ type: A.TODO_CARRY, from: el.dataset.from, to: el.dataset.to });
+      toast("📦", "오늘로 옮겼어요");
+    },
     openHabitActions: (el) => ui({ sheet: { type: "habitActions", id: el.dataset.id } }),
     openHabitForm: (el) => {
-      const values = habitFormValues(getState().data, el?.dataset.id || null, todayKey());
+      let values = habitFormValues(getState().data, el?.dataset.id || null, todayKey());
+      const source = el?.dataset.fromTodo && getState().data.todos[el.dataset.fromTodo];
+      if (source) values = { ...values, name: source.title, triggerType: source.time ? "time" : "none", triggerTime: source.time || "" };
       initHabitDrafts(drafts, values);
       ui({ sheet: null, page: { type: "habitForm", values } });
       if (!values.id) focusById("habitNameField");

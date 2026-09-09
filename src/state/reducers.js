@@ -17,6 +17,7 @@ export const A = {
   HABIT_MOVE: "habit/move",
   TODO_UPSERT: "todo/upsert",
   TODO_PRIORITY: "todo/priority",
+  TODO_CARRY: "todo/carry",
   TODO_TOGGLE: "todo/toggle",
   TODO_DELETE: "todo/delete",
   TODO_MOVE: "todo/move",
@@ -165,7 +166,18 @@ function priorityFields(priority) {
   return { urgent: !!priority.urgent, important: !!priority.important, classified: true };
 }
 
+/** from 날짜의 미완료 투두를 to 날짜 맨 뒤로 옮긴다. 시간은 유지. */
+function carryTodos(todos, { from, to }) {
+  const moving = todosOfDate(todos, from).filter((t) => !t.done).sort((a, b) => a.order - b.order);
+  if (!moving.length) return todos;
+  let order = maxOrder(todosOfDate(todos, to));
+  const next = { ...todos };
+  for (const t of moving) next[t.id] = { ...t, date: to, order: ++order };
+  return next;
+}
+
 function todosReducer(todos, action) {
+  if (action.type === A.TODO_CARRY) return carryTodos(todos, action);
   const todo = todos[action.id];
   switch (action.type) {
     case A.TODO_UPSERT: return upsertTodo(todos, action);
@@ -226,6 +238,7 @@ export function initialUi({ today, syncCode, firebaseReady, route = "home" }) {
   return {
     route,               // home | stats | goals | settings
     homeTab: "habits",   // habits | todos
+    homeRange: "day",    // day | week
     selectedDate: today,
     statsMonth: today.slice(0, 7),
     statsTab: "month",   // month | week | green

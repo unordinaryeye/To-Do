@@ -190,3 +190,23 @@
 .reorder-row .handle{font-size:20px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;text-align:center;padding:8px 0}
 .reorder-row .handle:active{cursor:grabbing}
 .habit-card.single{margin-top:12px}
+
+/* 주 보기 / 날짜 피커 / 이월 배너 */
+.wk-table.home{padding:10px 8px}
+.wk-table.home .wk-row{grid-template-columns:1fr repeat(7,34px);gap:3px}
+.wk-table.home .wk-row.head .wk-cell{white-space:pre-line;line-height:1.2;font-size:10px}
+.wk-table.home .wk-cell.today{color:var(--accent);font-weight:700}
+.wk-check{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:15px;display:flex;align-items:center;justify-content:center;margin:0 auto}
+.wk-check.on{border-color:var(--accent);background:var(--accent-soft)}
+.wk-check.off{border-style:dashed;color:var(--line);background:transparent}
+.wk-check.future{opacity:.35}
+.tw-list{display:flex;flex-direction:column;gap:10px}
+.tw-day{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.tw-day.today{border-color:var(--accent)}
+.tw-head{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
+.tw-item{display:flex;align-items:flex-start;gap:6px;font-size:13px}
+.tw-item.done .mx-title{color:var(--muted);text-decoration:line-through}
+.date-pick{position:relative;overflow:hidden;cursor:pointer;margin-left:4px}
+.date-pick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.carry-banner{display:flex;justify-content:space-between;align-items:center;background:var(--yellow-soft);border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#92400E;cursor:pointer}
+.carry-cta{font-weight:700;color:#D97706}

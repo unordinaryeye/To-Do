@@ -98,3 +98,20 @@ suite("goalTags: 리듀서", (test) => {
     assertDeepEqual(state.data.habits.r1.policies.at(-1).goalTagIds, ["health", "morning"]);
   });
 });
+
+suite("todo: 이월", (test) => {
+  const fresh = () => ({ data: defaultData(TODAY), ui: initialUi({ today: TODAY, syncCode: "", firebaseReady: false }) });
+  test("어제 미완료만 오늘 맨 뒤로, 시간 유지, 완료는 남김", () => {
+    let state = fresh();
+    state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "오늘것", date: TODAY, time: null });
+    state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "어제 미완", date: "2026-09-08", time: "10:00" });
+    state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "어제 완료", date: "2026-09-08", time: null });
+    const done = todosForDate(state.data, "2026-09-08").find((t) => t.title === "어제 완료");
+    state = rootReducer(state, { type: A.TODO_TOGGLE, id: done.id });
+    state = rootReducer(state, { type: A.TODO_CARRY, from: "2026-09-08", to: TODAY });
+    assertDeepEqual(todosForDate(state.data, TODAY).map((t) => t.title), ["어제 미완", "오늘것"]);
+    assertEqual(todosForDate(state.data, TODAY)[0].time, "10:00");
+    assertDeepEqual(todosForDate(state.data, "2026-09-08").map((t) => t.title), ["어제 완료"]);
+    assertEqual(rootReducer(state, { type: A.TODO_CARRY, from: "2026-09-08", to: TODAY }), state, "옮길 게 없으면 같은 참조");
+  });
+});
