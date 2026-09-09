@@ -2,7 +2,8 @@ import { suite, assertEqual, assertDeepEqual, assertTrue } from "./harness.js";
 import { rootReducer, A, initialUi } from "../src/state/reducers.js";
 import { createStore } from "../src/state/store.js";
 import { defaultData } from "../src/domain/migrate.js";
-import { todosForDate, activeHabits, habitsForDate, endedHabits, todoMoveBounds } from "../src/state/selectors.js";
+import { todosForDate, activeHabits, habitsForDate, endedHabits, todoMoveBounds, pausedHabits } from "../src/state/selectors.js";
+import { globalStreak } from "../src/domain/metrics.js";
 import { policyAt } from "../src/domain/schedule.js";
 
 const TODAY = "2026-09-09";
@@ -197,5 +198,46 @@ suite("store", (test) => {
     assertEqual(calls, 0);
     store.dispatch({ type: A.UI_SET, patch: { route: "stats" } });
     assertEqual(calls, 1);
+  });
+});
+
+suite("reducers: 쉬어가기 / 복사 / 순서변경", (test) => {
+  test("쉬어가기: 기간 동안 예정 아님, 끝나면 자동 재개, 설정 유지", () => {
+    let state = rootReducer(freshState(), newHabit({ id: "r2", name: "s", emoji: "🤸", startDate: "2000-01-01", repeatDays: [1, 3, 5], trigger: { type: "time", value: "07:00" } }));
+    state = rootReducer(state, { type: A.HABIT_PAUSE, id: "r2", from: TODAY, until: "2026-09-11" });
+    const h = state.data.habits.r2;
+    assertEqual(habitsForDate(state.data, "2026-09-09").some((x) => x.id === "r2"), false); // 수
+    assertEqual(habitsForDate(state.data, "2026-09-11").some((x) => x.id === "r2"), false); // 금
+    assertTrue(habitsForDate(state.data, "2026-09-14").some((x) => x.id === "r2"));          // 다음 월
+    assertDeepEqual(policyAt(h, "2026-09-14").repeat.days, [1, 3, 5]);
+    assertDeepEqual(policyAt(h, "2026-09-14").trigger, { type: "time", value: "07:00" });
+  });
+  test("기한 없는 쉬어가기는 다시 시작으로 복귀", () => {
+    let state = rootReducer(freshState(), { type: A.HABIT_PAUSE, id: "r1", from: TODAY, until: null });
+    assertEqual(habitsForDate(state.data, "2026-09-30").some((x) => x.id === "r1"), false);
+    assertTrue(pausedHabits(state.data, TODAY).some((x) => x.id === "r1"));
+    state = rootReducer(state, { type: A.HABIT_RESUME, id: "r1", today: "2026-09-12" });
+    assertEqual(habitsForDate(state.data, "2026-09-11").some((x) => x.id === "r1"), false);
+    assertTrue(habitsForDate(state.data, "2026-09-12").some((x) => x.id === "r1"));
+  });
+  test("쉬는 날은 전체 스트릭을 끊지 않는다", () => {
+    const only = { data: { ...freshState().data, habits: { r1: freshState().data.habits.r1 } }, ui: initialUi({ today: TODAY, syncCode: "", firebaseReady: false }) };
+    let state = rootReducer(only, { type: A.CHECK_TOGGLE, date: "2026-09-07", habitId: "r1" });
+    state = rootReducer(state, { type: A.CHECK_TOGGLE, date: "2026-09-08", habitId: "r1" });
+    state = rootReducer(state, { type: A.HABIT_PAUSE, id: "r1", from: TODAY, until: TODAY });
+    assertEqual(globalStreak(state.data.habits, state.data.checks, TODAY), 2);
+  });
+  test("복사: 설정 같고 오늘부터, 기록은 없음", () => {
+    let state = rootReducer(freshState(), newHabit({ id: "r2", name: "s", emoji: "🤸", startDate: "2000-01-01", repeatDays: [6, 7] }));
+    state = rootReducer(state, { type: A.HABIT_COPY, id: "r2", today: TODAY });
+    const copy = Object.values(state.data.habits).find((x) => x.name === "s (복사)");
+    assertEqual(copy.startDate, TODAY);
+    assertDeepEqual(copy.policies.map((p) => p.effectiveFrom), [TODAY]);
+    assertDeepEqual(copy.policies[0].repeat.days, [6, 7]);
+    assertEqual(copy.order, 6);
+  });
+  test("순서변경: 주어진 순서대로 order 재부여", () => {
+    const state = rootReducer(freshState(), { type: A.HABIT_REORDER, orderedIds: ["r6", "r5", "r4", "r3", "r2", "r1"] });
+    assertDeepEqual(activeHabits(state.data).map((h) => h.id), ["r6", "r5", "r4", "r3", "r2", "r1"]);
   });
 });

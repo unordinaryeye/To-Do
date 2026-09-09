@@ -11,6 +11,11 @@ export function endedHabits(data, todayKey) {
   return activeHabits(data).filter((h) => h.endDate && compareKeys(h.endDate, todayKey) < 0);
 }
 
+/** 오늘 쉬는 중인 습관 */
+export function pausedHabits(data, todayKey) {
+  return activeHabits(data).filter((h) => !h.endDate && currentPolicy(h, todayKey)?.status === "paused");
+}
+
 /** 선택일에 예정된 습관. 태그 필터가 있으면 그날 정책의 태그로 거른다. */
 export function habitsForDate(data, dateKey, filterTagId = null) {
   const list = scheduledHabits(data.habits, dateKey);

@@ -17,6 +17,7 @@ function header(state) {
     h("button", { class: "month-btn", dataset: { action: "goToday" }, title: "오늘로 이동" }, formatMonthKR(monthKey(selectedDate))),
     h("div", { class: "head-right" },
       h("div", { class: `streak-badge${streak > 0 ? " hot" : ""}`, "aria-label": `연속 ${streak}일` }, "🔥", String(streak)),
+      h("button", { class: "icon-btn", dataset: { action: "openReorder" }, "aria-label": "순서변경" }, "↕"),
       h("button", { class: "icon-btn", dataset: { action: "openSettingsRoute" }, "aria-label": "설정" }, "⋯"),
     ),
   );

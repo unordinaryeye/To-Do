@@ -5,6 +5,12 @@ export function chip(label, { on = false, dark = false, small = false, dataset }
   return h("button", { class: cls, dataset }, label);
 }
 
+/** ▲▼ 이동 버튼 쌍. 첫/마지막 항목이면 비활성. */
+export function moveButtons(action, id, { isFirst, isLast }) {
+  const btn = (dir, label, disabled) => h("button", { class: `move-btn${disabled ? " disabled" : ""}`, dataset: { action, id, dir }, "aria-label": label, disabled }, dir === "-1" ? "▲" : "▼");
+  return h("div", { class: "move-group" }, btn("-1", "위로", isFirst), btn("1", "아래로", isLast));
+}
+
 export function emptyState(icon, main, sub) {
   return h("div", { class: "empty-state" },
     h("div", { class: "big" }, icon),

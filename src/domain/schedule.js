@@ -18,6 +18,16 @@ export function currentPolicy(habit, todayKey) {
   return policyAt(habit, todayKey) || habit.policies[habit.policies.length - 1] || null;
 }
 
+/** 날짜 이전(당일 포함)에 시작한 정책 중 가장 최근의 active 정책. 쉬어가기 재개 시 설정 복원에 쓴다. */
+export function lastActivePolicy(habit, dateKey) {
+  let found = null;
+  for (const policy of habit.policies) {
+    if (compareKeys(policy.effectiveFrom, dateKey) > 0) break;
+    if (policy.status === "active") found = policy;
+  }
+  return found;
+}
+
 export function isScheduled(habit, dateKey) {
   if (habit.deletedAt) return false;
   if (compareKeys(dateKey, habit.startDate) < 0) return false;

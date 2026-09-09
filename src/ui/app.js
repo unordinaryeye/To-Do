@@ -10,6 +10,7 @@ import { renderGoals } from "./goals.js";
 import { renderSettings } from "./settings.js";
 import { renderHabitForm, renderTodoForm, renderTagForm } from "./forms.js";
 import { renderSheet } from "./sheets.js";
+import { renderReorder } from "./reorder.js";
 import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 
 /** 입력 중인 값(비제어). store 밖에 두어 타이핑·피커 조작마다 재렌더하지 않는다. */
@@ -20,10 +21,11 @@ const drafts = {
 };
 
 const SCREENS = { home: renderHome, stats: renderStats, goals: renderGoals, settings: renderSettings };
-const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm };
+const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm, reorder: renderReorder };
 const IME_KEYCODE = 229;
 
 let layerWasOpen = false;
+let actionsRef = null;
 let savedScrollY = 0;
 
 /** 시트/페이지를 history 항목으로 다뤄 iOS 뒤로가기 제스처가 앱을 빠져나가지 않게 한다. */
@@ -45,7 +47,7 @@ export function render(state) {
   replaceContent(app, SCREENS[ui.route](state, drafts), renderTabBar(ui.route));
   app.hidden = !!ui.page; // 전체 화면 페이지가 열리면 뒤 화면을 숨겨 스크롤/포커스가 새지 않게 한다
   const layers = [];
-  if (ui.page && PAGES[ui.page.type]) layers.push(PAGES[ui.page.type](state, drafts));
+  if (ui.page && PAGES[ui.page.type]) layers.push(PAGES[ui.page.type](state, drafts, actionsRef));
   const sheetNode = renderSheet(state, drafts);
   if (sheetNode) layers.push(sheetNode);
   replaceContent(overlay, ...layers);
@@ -111,7 +113,8 @@ function bindRestore(store) {
 }
 
 export function mountApp({ store, sync }) {
-  bindEvents(createActions({ store, sync, drafts }));
+  actionsRef = createActions({ store, sync, drafts });
+  bindEvents(actionsRef);
   bindRestore(store);
   render(store.getState());
 }

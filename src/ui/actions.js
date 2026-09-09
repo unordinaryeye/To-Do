@@ -159,9 +159,20 @@ export function createActions({ store, sync, drafts }) {
       toast("✅", drafts.startDate > todayKey() ? "시작 날짜부터 적용돼요" : "오늘부터 적용돼요");
     },
     moveHabit: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir), date: selected() }),
+    moveHabitAll: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir) }),
     askEndHabit: (el) => ui({ sheet: { type: "confirmEndHabit", id: el.dataset.id } }),
     endHabit: (el) => { dispatch({ type: A.HABIT_END, id: el.dataset.id, date: addDays(todayKey(), -1) }); closeAll(); toast("⛔", "루틴을 끝냈어요. 내정보에서 다시 시작할 수 있어요"); },
-    resumeHabit: (el) => { dispatch({ type: A.HABIT_RESUME, id: el.dataset.id }); toast("▶️", "루틴을 다시 시작했어요"); },
+    resumeHabit: (el) => { dispatch({ type: A.HABIT_RESUME, id: el.dataset.id, today: todayKey() }); toast("▶️", "루틴을 다시 시작했어요"); },
+    openPauseSheet: (el) => ui({ sheet: { type: "pause", id: el.dataset.id } }),
+    pauseHabit: (el) => {
+      dispatch({ type: A.HABIT_PAUSE, id: el.dataset.id, from: todayKey(), until: el.dataset.until || null });
+      ui({ sheet: null });
+      toast("🛌", el.dataset.until ? "쉬어가요. 끝나면 자동으로 다시 예정돼요" : "쉬어가요. 내정보에서 다시 시작할 수 있어요");
+    },
+    copyHabit: (el) => { dispatch({ type: A.HABIT_COPY, id: el.dataset.id, today: todayKey() }); ui({ sheet: null }); toast("📋", "복사했어요. 오늘부터 시작돼요"); },
+    openHabitRecord: (el) => ui({ sheet: { type: "record", id: el.dataset.id }, statsMonth: todayKey().slice(0, 7) }),
+    openReorder: () => ui({ sheet: null, page: { type: "reorder" } }),
+    reorderHabits: (orderedIds) => dispatch({ type: A.HABIT_REORDER, orderedIds }),
     askDeleteHabit: (el) => ui({ sheet: { type: "confirmDeleteHabit", id: el.dataset.id } }),
     deleteHabit: (el) => { dispatch({ type: A.HABIT_DELETE, id: el.dataset.id }); closeAll(); toast("🗑", "루틴을 삭제했어요"); },
   };

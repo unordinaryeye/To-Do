@@ -2,7 +2,9 @@ import { h } from "../utils/dom.js";
 import { todayKey, formatDateDots } from "../utils/date.js";
 import { currentPolicy } from "../domain/schedule.js";
 import { repeatLabel, triggerLabel } from "../domain/format.js";
-import { habitMoveBounds, todoMoveBounds, endedHabits } from "../state/selectors.js";
+import { habitMoveBounds, todoMoveBounds, endedHabits, pausedHabits } from "../state/selectors.js";
+import { monthlyStats, habitStreak } from "../domain/metrics.js";
+import { addDays, weekOf } from "../utils/date.js";
 import { sheet, actionItem, confirmBox, listItem } from "./parts.js";
 import { scheduleEditor, emojiGrid } from "./forms.js";
 import { QUADRANTS, quadrantOf } from "../domain/todo.js";
@@ -29,6 +31,9 @@ function habitActions(state, id) {
     actionItem("시간·반복 바꾸기", "🕒", { action: "openSchedule", id }),
     actionItem("위로 이동", "▲", { action: "moveHabit", id, dir: "-1" }, { disabled: !bounds.up }),
     actionItem("아래로 이동", "▼", { action: "moveHabit", id, dir: "1" }, { disabled: !bounds.down }),
+    actionItem("월간 기록", "📊", { action: "openHabitRecord", id }),
+    actionItem("복사하기", "📋", { action: "copyHabit", id }),
+    actionItem("쉬어가기", "🛌", { action: "openPauseSheet", id }),
     actionItem("끝내기", "⛔", { action: "askEndHabit", id }),
     actionItem("삭제하기", "🗑", { action: "askDeleteHabit", id }, { danger: true }),
     h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
@@ -102,19 +107,62 @@ function fabMenu(state) {
   );
 }
 
-/** 종료된 루틴 목록: 다시 시작(종료일 해제)으로 복구할 수 있다. */
+/** 종료·휴식 중인 루틴 목록: 다시 시작으로 복구할 수 있다. */
 function endedSheet(state) {
-  const list = endedHabits(state.data, todayKey());
+  const today = todayKey();
+  const rows = [
+    ...endedHabits(state.data, today).map((habit) => ({ habit, sub: `${formatDateDots(habit.endDate)} 종료` })),
+    ...pausedHabits(state.data, today).map((habit) => ({ habit, sub: "쉬는 중" })),
+  ];
   return sheet([
-    list.length
-      ? list.map((habit) => listItem({
-        icon: habit.emoji, main: habit.name, sub: `${formatDateDots(habit.endDate)} 종료`,
+    rows.length
+      ? rows.map(({ habit, sub }) => listItem({
+        icon: habit.emoji, main: habit.name, sub,
         right: h("button", { class: "btn ghost", dataset: { action: "resumeHabit", id: habit.id } }, "다시 시작"),
         isStatic: true,
       }))
-      : h("div", { class: "empty-state" }, h("p", { class: "main" }, "끝낸 루틴이 없어요")),
+      : h("div", { class: "empty-state" }, h("p", { class: "main" }, "끝냈거나 쉬는 루틴이 없어요")),
     h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
-  ], { title: "끝낸 루틴", sub: "다시 시작하면 오늘부터 다시 예정돼요. 지난 기록은 그대로예요." });
+  ], { title: "끝낸·쉬는 루틴", sub: "다시 시작하면 오늘부터 다시 예정돼요. 지난 기록은 그대로예요." });
+}
+
+function pauseSheet(state, id) {
+  const habit = state.data.habits[id];
+  if (!habit) return null;
+  const today = todayKey();
+  const week = weekOf(today, state.data.settings.weekStart ?? 1);
+  const option = (label, sub, until) => actionItem(`${label} · ${sub}`, "›", { action: "pauseHabit", id, until: until ?? "" });
+  return sheet([
+    option("오늘만", "내일부터 다시", today),
+    option("내일까지", `${formatDateDots(addDays(today, 1))}까지`, addDays(today, 1)),
+    option("이번 주 끝까지", `${formatDateDots(week[6])}까지`, week[6]),
+    option("일주일", `${formatDateDots(addDays(today, 6))}까지`, addDays(today, 6)),
+    option("기한 없이", "내정보에서 다시 시작", null),
+    h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
+  ], { title: `${habit.emoji} ${habit.name} 쉬어가기`, sub: "쉬는 동안은 예정에서 빠지고 스트릭도 끊기지 않아요." });
+}
+
+function recordSheet(state, id) {
+  const habit = state.data.habits[id];
+  if (!habit) return null;
+  const today = todayKey();
+  const { checks, settings } = state.data;
+  const month = state.ui.statsMonth;
+  const stats = monthlyStats({ [id]: habit }, checks, month, today);
+  const row = stats.perHabit[0];
+  const streak = habitStreak(habit, checks, today);
+  return sheet([
+    h("div", { class: "card-row" },
+      h("button", { class: "arrow", dataset: { action: "moveStatsMonth", n: "-1" }, "aria-label": "지난달" }, "‹"),
+      h("span", { class: "card-title" }, `${month.slice(0, 4)}년 ${Number(month.slice(5))}월`),
+      h("button", { class: `arrow${month === today.slice(0, 7) ? " dim" : ""}`, dataset: { action: "moveStatsMonth", n: "1" }, disabled: month === today.slice(0, 7), "aria-label": "다음달" }, "›"),
+    ),
+    row ? h("div", { class: "habit-card single" },
+      h("div", { class: "day-grid" }, stats.days.map((day) => h("div", { class: `day-cell ${row.cells[day]}` }, String(Number(day.slice(8)))))),
+      h("div", { class: "hc-foot" }, h("span", null, `🕓 ${row.pct == null ? "–" : row.pct + "%"}`), h("span", null, `✔ ${row.done}`), h("span", null, `🔥 ${streak}`)),
+    ) : h("div", { class: "empty-state" }, h("p", { class: "main" }, "이 달엔 예정일이 없어요")),
+    h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
+  ], { title: `${habit.emoji} ${habit.name}`, sub: "월간 기록" });
 }
 
 export function renderSheet(state, drafts) {
@@ -133,6 +181,8 @@ export function renderSheet(state, drafts) {
     }
     case "fab": return fabMenu(state);
     case "ended": return endedSheet(state);
+    case "pause": return pauseSheet(state, s.id);
+    case "record": return recordSheet(state, s.id);
     case "confirmEndHabit": {
       const name = state.data.habits[s.id]?.name ?? "";
       return confirmBox([`"${name}" 루틴을 오늘부터 끝낼까요?`, h("br"), "기록은 남고, 내정보 → 끝낸 루틴에서 다시 시작할 수 있어요."], "끝내기", { action: "endHabit", id: s.id }, { danger: false });

@@ -1,4 +1,5 @@
-import { makePolicy, withPolicy, alignFirstPolicy, currentPolicy, scheduledHabits } from "../domain/schedule.js";
+import { makePolicy, withPolicy, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy } from "../domain/schedule.js";
+import { addDays } from "../utils/date.js";
 import { compareKeys } from "../utils/date.js";
 import { quadrantRank } from "../domain/todo.js";
 import { newId } from "../utils/id.js";
@@ -9,6 +10,9 @@ export const A = {
   HABIT_UPSERT: "habit/upsert",
   HABIT_END: "habit/end",
   HABIT_RESUME: "habit/resume",
+  HABIT_PAUSE: "habit/pause",
+  HABIT_COPY: "habit/copy",
+  HABIT_REORDER: "habit/reorder",
   HABIT_DELETE: "habit/delete",
   HABIT_MOVE: "habit/move",
   TODO_UPSERT: "todo/upsert",
@@ -75,12 +79,50 @@ function upsertHabit(habits, action) {
   return { ...habits, [habitId]: habit };
 }
 
+/** 쉬어가기: from부터 paused, until이 있으면 다음 날부터 다시 active. 설정은 마지막 활성 정책을 복사한다. */
+function pauseHabit(habit, { from, until }) {
+  const base = lastActivePolicy(habit, from) || habit.policies[habit.policies.length - 1];
+  let policies = withPolicy(habit.policies, { ...base, effectiveFrom: from, status: "paused" });
+  if (until) policies = withPolicy(policies, { ...base, effectiveFrom: addDays(until, 1), status: "active" });
+  return { ...habit, policies };
+}
+
+/** 다시 시작: 종료일을 지우고, 쉬는 중이면 오늘부터 active 정책을 넣는다. */
+function resumeHabit(habit, today) {
+  const current = currentPolicy(habit, today);
+  if (current && current.status === "active") return { ...habit, endDate: null };
+  const base = lastActivePolicy(habit, today) || current || habit.policies[habit.policies.length - 1];
+  return { ...habit, endDate: null, policies: withPolicy(habit.policies, { ...base, effectiveFrom: today, status: "active" }) };
+}
+
+function copyHabit(habits, habit, today) {
+  const base = lastActivePolicy(habit, today) || habit.policies[habit.policies.length - 1];
+  const id = newId("h");
+  return {
+    ...habits,
+    [id]: {
+      ...habit, id, name: `${habit.name} (복사)`, order: maxOrder(Object.values(habits)) + 1,
+      startDate: today, endDate: null, deletedAt: null,
+      policies: [{ ...base, effectiveFrom: today, status: "active" }],
+    },
+  };
+}
+
+function reorderHabits(habits, orderedIds) {
+  const next = { ...habits };
+  orderedIds.forEach((id, index) => { if (next[id]) next[id] = { ...next[id], order: index }; });
+  return next;
+}
+
 function habitsReducer(habits, action) {
   const habit = habits[action.id];
   switch (action.type) {
     case A.HABIT_UPSERT: return upsertHabit(habits, action);
     case A.HABIT_END: return habit ? { ...habits, [action.id]: { ...habit, endDate: action.date } } : habits;
-    case A.HABIT_RESUME: return habit ? { ...habits, [action.id]: { ...habit, endDate: null } } : habits;
+    case A.HABIT_RESUME: return habit ? { ...habits, [action.id]: resumeHabit(habit, action.today) } : habits;
+    case A.HABIT_PAUSE: return habit ? { ...habits, [action.id]: pauseHabit(habit, action) } : habits;
+    case A.HABIT_COPY: return habit ? copyHabit(habits, habit, action.today) : habits;
+    case A.HABIT_REORDER: return reorderHabits(habits, action.orderedIds);
     case A.HABIT_DELETE: return habit ? without(habits, action.id) : habits;
     case A.HABIT_MOVE: {
       // 화면에 보이는 목록(선택일 예정 습관) 안에서 이웃과 바꾼다. date가 없으면 전체 목록.
