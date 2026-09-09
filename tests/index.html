@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Daily Routine 테스트</title>
+<style>
+body{font-family:system-ui,sans-serif;padding:20px;max-width:800px;margin:0 auto}
+h1{font-size:18px}
+.ok{color:#059669}.fail{color:#DC2626}
+pre{background:#F5F5F4;padding:8px;border-radius:6px;white-space:pre-wrap;font-size:12px}
+li{margin:4px 0}
+</style>
+</head>
+<body>
+<h1>Daily Routine 도메인 테스트</h1>
+<p id="summary">실행 중…</p>
+<ul id="results"></ul>
+<script type="module">
+import "./migrate.test.js";
+import "./schedule.test.js";
+import "./metrics.test.js";
+import "./reducers.test.js";
+import { runAll } from "./harness.js";
+
+const list = document.getElementById("results");
+const { passed, failed } = await runAll(({ suite, name, ok, error }) => {
+  const li = document.createElement("li");
+  li.className = ok ? "ok" : "fail";
+  li.textContent = `${ok ? "✓" : "✗"} [${suite}] ${name}`;
+  if (!ok) { const pre = document.createElement("pre"); pre.textContent = error.stack || error.message; li.append(pre); }
+  list.append(li);
+});
+const summary = document.getElementById("summary");
+summary.textContent = `${passed} passed, ${failed} failed`;
+summary.className = failed ? "fail" : "ok";
+</script>
+</body>
+</html>

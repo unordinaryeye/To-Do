@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(180deg,#FAFAF9 0%,#F5F5F4 100%);color:#1C1917;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:0;display:none}
+@keyframes checkPop{0%{transform:scale(.8)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes progressGrow{from{width:0}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(40px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(40px) scale(.95)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.check-pop{animation:checkPop .25s ease}.fade-in{animation:fadeIn .3s ease forwards}.slide-in{animation:slideIn .3s ease forwards}.progress-bar{animation:progressGrow .6s ease}
