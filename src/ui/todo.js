@@ -20,13 +20,13 @@ function listRow(todo, index, state, now) {
   const late = todo.time && !todo.done && state.ui.selectedDate === todayKey() && todo.time < now;
   const badges = priorityBadges(todo);
   return h("div", { class: "row todo-row" },
-    checkCell(todo),
     h("div", { class: "cell when", dataset: { action: "openTodoForm", id: todo.id }, role: "button", tabindex: "0", "aria-label": "시간 설정" },
       h("span", { class: `t${late ? " late" : ""}` }, todo.time ? `${todo.time}${late ? "!" : ""}` : "–")),
     h("div", { class: "cell name", dataset: { action: "openTodoActions", id: todo.id }, role: "button", tabindex: "0" },
       h("span", { class: "rank" }, String(index + 1)),
       h("span", { class: `txt${todo.done ? " done" : ""}` }, badges ? `${badges} ${todo.title}` : todo.title),
     ),
+    checkCell(todo),
   );
 }
 
@@ -92,10 +92,10 @@ function habitRows(state) {
     const { count, target } = checkProgress(state.data, habit, selectedDate);
     const partial = !done && count > 0;
     return h("div", { class: "row todo-row habit-in-todo" },
-      h("div", { class: `cell check${done ? " on check-pop" : ""}${partial ? " partial" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": habit.name }, done ? habit.emoji : partial ? `${count}/${target}` : ""),
       h("div", { class: "cell when" }, h("span", { class: "t ctx" }, triggerLabel(policy?.trigger, settings.clock24))),
       h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
         h("span", { class: "rank" }, "🔁"), h("span", { class: `txt${done ? " done" : ""}` }, `${habit.emoji} ${habit.name}`)),
+      h("div", { class: `cell check${done ? " on check-pop" : ""}${partial ? " partial" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": habit.name }, done ? habit.emoji : partial ? `${count}/${target}` : ""),
     );
   });
 }

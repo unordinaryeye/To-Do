@@ -111,13 +111,13 @@ function habitRow(habit, index, state) {
   if (!done && count > 0) { check.classList.add("partial"); check.textContent = `${count}/${target}`; }
   else if (done && target > 1) check.append(h("span", { class: "count-badge" }, `${count}/${target}`));
   return h("div", { class: "row", dataset: { habitId: habit.id } },
-    check,
     whenCell(policy, settings.clock24, { action: "openSchedule", id: habit.id }),
     h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
       h("span", { class: "rank" }, String(index + 1)),
       h("span", { class: "txt" }, `${habit.emoji} ${habit.name}`),
       streak > 0 ? h("span", { class: "fire hot", "aria-label": `연속 ${streak}회` }, `🔥${streak}`) : null,
     ),
+    check,
   );
 }
 
