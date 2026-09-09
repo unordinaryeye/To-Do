@@ -6,6 +6,7 @@ import "./reducers.test.js";
 import "./sync-docs.test.js";
 import "./format.test.js";
 import "./todo.test.js";
+import "./mandala.test.js";
 import { runAll } from "./harness.js";
 
 const { passed, failed } = await runAll(({ suite, name, ok, error }) => {

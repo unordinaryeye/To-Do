@@ -11,17 +11,18 @@ import { renderSettings } from "./settings.js";
 import { renderHabitForm, renderTodoForm, renderTagForm } from "./forms.js";
 import { renderSheet } from "./sheets.js";
 import { renderReorder } from "./reorder.js";
+import { renderMandalaPage, renderMandalaFull } from "./mandala.js";
 import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 
 /** 입력 중인 값(비제어). store 밖에 두어 타이핑·피커 조작마다 재렌더하지 않는다. */
 const drafts = {
   todo: "", sync: "",
   habitName: "", triggerText: "", triggerTime: "", startDate: "", endDate: "",
-  todoTitle: "", todoTime: "", todoDate: "", tagName: "",
+  todoTitle: "", todoTime: "", todoDate: "", tagName: "", mandalaText: "",
 };
 
 const SCREENS = { home: renderHome, stats: renderStats, goals: renderGoals, settings: renderSettings };
-const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm, reorder: renderReorder };
+const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm, reorder: renderReorder, mandala: renderMandalaPage, mandalaFull: renderMandalaFull };
 const IME_KEYCODE = 229;
 
 let layerWasOpen = false;

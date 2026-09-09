@@ -9,6 +9,7 @@ import { REPEAT_PRESETS } from "../domain/format.js";
 import { habitFormValues, todoFormValues, tagFormValues } from "../state/selectors.js";
 import { TAG_COLORS } from "../config.js";
 import { parseTodoInput, quadrantById } from "../domain/todo.js";
+import { normalizeMandala } from "../domain/mandala.js";
 import { habitFormError, initHabitDrafts, initTodoDrafts, initTagDrafts } from "./forms.js";
 import { toast } from "./toast.js";
 
@@ -164,9 +165,12 @@ export function createActions({ store, sync, drafts }) {
       const values = getState().ui.page?.values;
       const error = values && habitFormError(values, drafts, todayKey());
       if (!values || error) { toast("⚠️", error || "입력을 확인해 주세요"); return; }
-      dispatch(habitPayload(values, drafts.habitName.trim(), values.emoji));
-      closeAll();
-      toast("✅", values.id ? "루틴을 저장했어요" : "루틴을 시작했어요");
+      const page = getState().ui.page;
+      const id = values.id || newId("h");
+      dispatch({ ...habitPayload(values, drafts.habitName.trim(), values.emoji), id });
+      if (page?.linkTo) dispatch({ type: A.MANDALA_LINK, tagId: page.linkTo.tagId, sector: page.linkTo.sector, action: page.linkTo.cell, habitId: id, on: true });
+      ui({ sheet: null, page: page?.returnTo || null });
+      toast("✅", values.id ? "루틴을 저장했어요" : page?.linkTo ? "루틴을 만들고 만다라트에 연결했어요" : "루틴을 시작했어요");
     },
     submitSchedule: () => {
       const values = getState().ui.sheet?.values;
@@ -301,5 +305,63 @@ export function createActions({ store, sync, drafts }) {
     },
   };
 
-  return { ...navigation, ...form, ...tags, ...habits, ...todos, ...data, ...syncActions };
+  const mandalaCellOf = (el) => ({ tagId: el.dataset.tagId, sector: Number(el.dataset.sector), cell: Number(el.dataset.cell) });
+  const mandalaText = (tagId, sector, cellIndex) => {
+    const m = normalizeMandala(getState().data.goalTags[tagId]?.mandala);
+    return cellIndex == null ? m.sectors[sector].text : m.sectors[sector].actions[cellIndex].text;
+  };
+
+  const mandala = {
+    openMandala: (el) => ui({ sheet: null, page: { type: "mandala", tagId: el.dataset.tagId, sector: null } }),
+    openMandalaFull: (el) => ui({ page: { type: "mandalaFull", tagId: el.dataset.tagId } }),
+    openMandalaSector: (el) => ui({ sheet: null, page: { type: "mandala", tagId: el.dataset.tagId, sector: Number(el.dataset.sector) } }),
+    editMandalaSector: (el) => {
+      const sector = Number(el.dataset.sector);
+      drafts.mandalaText = mandalaText(el.dataset.tagId, sector, null);
+      ui({ sheet: { type: "mandalaSector", tagId: el.dataset.tagId, sector } });
+      focusById("mandalaTextField");
+    },
+    submitMandalaSector: (el) => {
+      const { tagId, sector } = getState().ui.sheet;
+      const text = el?.dataset.clear ? "" : drafts.mandalaText.trim();
+      dispatch({ type: A.MANDALA_SECTOR, tagId, sector, text });
+      ui({ sheet: null });
+    },
+    openMandalaCell: (el) => {
+      const c = mandalaCellOf(el);
+      drafts.mandalaText = mandalaText(c.tagId, c.sector, c.cell);
+      ui({ sheet: { type: "mandalaCell", ...c } });
+    },
+    backToMandalaCell: (el) => { const c = mandalaCellOf(el); drafts.mandalaText = mandalaText(c.tagId, c.sector, c.cell); ui({ sheet: { type: "mandalaCell", ...c } }); },
+    submitMandalaCell: () => {
+      const { tagId, sector, cell } = getState().ui.sheet;
+      dispatch({ type: A.MANDALA_ACTION, tagId, sector, action: cell, text: drafts.mandalaText.trim() });
+      ui({ sheet: null });
+      toast("✅", "저장했어요");
+    },
+    openMandalaLink: (el) => ui({ sheet: { type: "mandalaLink", ...mandalaCellOf(el) } }),
+    toggleMandalaLink: (el) => dispatch({ type: A.MANDALA_LINK, tagId: el.dataset.tagId, sector: Number(el.dataset.sector), action: Number(el.dataset.cell), habitId: el.dataset.habitId, on: el.dataset.on === "1" }),
+    unlinkMandalaHabit: (el) => dispatch({ type: A.MANDALA_LINK, tagId: el.dataset.tagId, sector: Number(el.dataset.sector), action: Number(el.dataset.cell), habitId: el.dataset.habitId, on: false }),
+    /** 실천항목 → 습관 폼(이름·태그 프리필). 저장 시 새 습관을 이 칸에 연결한다. */
+    mandalaToHabit: (el) => {
+      const c = mandalaCellOf(el);
+      const text = drafts.mandalaText.trim() || mandalaText(c.tagId, c.sector, c.cell);
+      if (text !== mandalaText(c.tagId, c.sector, c.cell)) dispatch({ type: A.MANDALA_ACTION, tagId: c.tagId, sector: c.sector, action: c.cell, text });
+      const values = { ...habitFormValues(getState().data, null, todayKey()), name: text, goalTagIds: [c.tagId] };
+      initHabitDrafts(drafts, values);
+      const returnTo = getState().ui.page;
+      ui({ sheet: null, page: { type: "habitForm", values, returnTo, linkTo: c } });
+      focusById("habitNameField");
+    },
+    mandalaToTodo: (el) => {
+      const c = mandalaCellOf(el);
+      const text = drafts.mandalaText.trim() || mandalaText(c.tagId, c.sector, c.cell);
+      if (!text) { toast("⚠️", "먼저 실천항목을 적어 주세요"); return; }
+      dispatch({ type: A.TODO_UPSERT, id: null, title: text, date: todayKey(), time: null, priority: { urgent: false, important: true } });
+      ui({ sheet: null });
+      toast("📌", "오늘 할 일에 추가했어요");
+    },
+  };
+
+  return { ...navigation, ...form, ...tags, ...habits, ...todos, ...data, ...syncActions, ...mandala };
 }

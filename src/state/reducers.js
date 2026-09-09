@@ -1,6 +1,7 @@
 import { makePolicy, applySettingsFrom, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy, pausePolicies, resumePolicies, policyAt } from "../domain/schedule.js";
 import { addDays, compareKeys } from "../utils/date.js";
 import { quadrantRank } from "../domain/todo.js";
+import { setSectorText, setActionText, linkHabit } from "../domain/mandala.js";
 import { newId } from "../utils/id.js";
 
 // ── 액션 타입 ──
@@ -21,6 +22,9 @@ export const A = {
   TODO_DELETE: "todo/delete",
   TODO_MOVE: "todo/move",
   TAG_UPSERT: "tag/upsert",
+  MANDALA_SECTOR: "mandala/sector",
+  MANDALA_ACTION: "mandala/action",
+  MANDALA_LINK: "mandala/link",
   TAG_DELETE: "tag/delete",
   SETTINGS_SET: "settings/set",
   DATA_REPLACE: "data/replace",
@@ -66,7 +70,7 @@ function toggleCheck(checks, { date, habitId }) {
 function upsertHabit(habits, action) {
   const { id, name, emoji, startDate, endDate, repeatDays, trigger, today, goalTagIds, showInTodo } = action;
   const existing = id ? habits[id] : null;
-  const habitId = existing ? id : newId("h");
+  const habitId = existing ? id : (id || newId("h"));
   const effectiveFrom = existing ? (compareKeys(startDate, today) > 0 ? startDate : today) : startDate;
   const base = existing ? currentPolicy(existing, effectiveFrom) : null;
   const policy = makePolicy(effectiveFrom, {
@@ -215,6 +219,16 @@ function tagsReducer(goalTags, action) {
       const tag = goalTags[action.id];
       return tag ? { ...goalTags, [action.id]: { ...tag, archived: true } } : goalTags;
     }
+    case A.MANDALA_SECTOR:
+    case A.MANDALA_ACTION:
+    case A.MANDALA_LINK: {
+      const tag = goalTags[action.tagId];
+      if (!tag) return goalTags;
+      const next = action.type === A.MANDALA_SECTOR ? setSectorText(tag.mandala, action.sector, action.text)
+        : action.type === A.MANDALA_ACTION ? setActionText(tag.mandala, action.sector, action.action, action.text)
+        : linkHabit(tag.mandala, action.sector, action.action, action.habitId, action.on);
+      return { ...goalTags, [action.tagId]: { ...tag, mandala: next } };
+    }
     default: return goalTags;
   }
 }
@@ -222,7 +236,13 @@ function tagsReducer(goalTags, action) {
 function dataReducer(data, action) {
   switch (action.type) {
     case A.TAG_UPSERT:
-    case A.TAG_DELETE: return { ...data, goalTags: tagsReducer(data.goalTags, action) };
+    case A.TAG_DELETE:
+    case A.MANDALA_SECTOR:
+    case A.MANDALA_ACTION:
+    case A.MANDALA_LINK: {
+      const goalTags = tagsReducer(data.goalTags, action);
+      return goalTags === data.goalTags ? data : { ...data, goalTags };
+    }
     case A.DATA_REPLACE: return action.data;
     case A.DATA_APPLY_REMOTE: return { ...data, ...action.patch };
     case A.CHECK_TOGGLE: return { ...data, checks: toggleCheck(data.checks, action) };

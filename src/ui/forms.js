@@ -101,7 +101,7 @@ export function scheduleEditor(values, drafts) {
 export function renderHabitForm(state, drafts) {
   const values = state.ui.page.values;
   const editing = !!values.id;
-  return page(editing ? "루틴 수정" : "루틴", { confirmLabel: "확인", confirmDataset: { action: "submitHabitForm" } },
+  return page(editing ? "루틴 수정" : "루틴", { confirmLabel: "확인", confirmDataset: { action: "submitHabitForm" }, backDataset: state.ui.page.returnTo ? { action: "backFromTagForm" } : { action: "closePage" } },
     h("div", { class: "form-name" },
       h("button", { class: "emoji-btn", dataset: { action: "openEmojiSheet" }, "aria-label": "이모지 선택" }, values.emoji),
       h("input", { id: "habitNameField", value: drafts.habitName, placeholder: "루틴 입력", maxlength: "30", dataset: { draft: "habitName" }, "aria-label": "루틴 이름" }),
