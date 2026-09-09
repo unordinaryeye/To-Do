@@ -1,7 +1,7 @@
 {
   "name": "Daily Routine",
   "short_name": "데일리루틴",
-  "id": "/To-Do/",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
