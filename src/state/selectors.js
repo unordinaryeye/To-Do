@@ -16,9 +16,27 @@ export function pausedHabits(data, todayKey) {
   return activeHabits(data).filter((h) => !h.endDate && currentPolicy(h, todayKey)?.status === "paused");
 }
 
-/** 선택일에 예정된 습관. 태그 필터가 있으면 그날 정책의 태그로 거른다. */
+const triggerTime = (habit, dateKey) => {
+  const trigger = policyAt(habit, dateKey)?.trigger;
+  return trigger?.type === "time" ? trigger.value : null;
+};
+
+/** 시간순 자동 정렬: 시간 있는 습관은 시간순으로 먼저, 나머지는 수동 순서. 설정으로 끌 수 있다. */
+export function sortHabitsForDisplay(list, data, dateKey) {
+  if (data.settings.sortByTime === false) return list;
+  return [...list].sort((a, b) => {
+    const ta = triggerTime(a, dateKey);
+    const tb = triggerTime(b, dateKey);
+    if (ta && tb) return ta < tb ? -1 : ta > tb ? 1 : a.order - b.order;
+    if (ta) return -1;
+    if (tb) return 1;
+    return a.order - b.order;
+  });
+}
+
+/** 선택일에 예정된 습관(표시 순서). 태그 필터가 있으면 그날 정책의 태그로 거른다. */
 export function habitsForDate(data, dateKey, filterTagId = null) {
-  const list = scheduledHabits(data.habits, dateKey);
+  const list = sortHabitsForDisplay(scheduledHabits(data.habits, dateKey), data, dateKey);
   if (!filterTagId) return list;
   return list.filter((habit) => (policyAt(habit, dateKey)?.goalTagIds || []).includes(filterTagId));
 }
@@ -70,11 +88,13 @@ export function quadrantGroups(data, dateKey) {
   return groups;
 }
 
-/** 습관 이동 가능 여부: 선택일 화면 목록 기준. */
+/** 습관 이동 가능 여부: 선택일 화면 목록 기준. 시간순 정렬 중이면 시간 있는 습관은 이동 불가. */
 export function habitMoveBounds(data, habitId, dateKey) {
-  const list = scheduledHabits(data.habits, dateKey);
+  const habit = data.habits[habitId];
+  if (data.settings.sortByTime !== false && habit && triggerTime(habit, dateKey)) return { up: false, down: false, byTime: true };
+  const list = habitsForDate(data, dateKey).filter((h) => data.settings.sortByTime === false || !triggerTime(h, dateKey));
   const index = list.findIndex((h) => h.id === habitId);
-  return { up: index > 0, down: index >= 0 && index < list.length - 1 };
+  return { up: index > 0, down: index >= 0 && index < list.length - 1, byTime: false };
 }
 
 export function recordedDayCount(data) {

@@ -80,6 +80,7 @@ function filterRow(state) {
       on: state.ui.filterTagId === tag.id,
       dataset: { action: "toggleFilterTag", id: tag.id },
     })),
+    h("button", { class: "chip sm tag-manage", dataset: { action: "openTagManage" }, "aria-label": "목표 태그 관리" }, tags.length ? "⚙" : "+ 목표"),
   );
 }
 
@@ -156,6 +157,5 @@ export function renderHome(state, drafts) {
       tab === "habits" ? (state.ui.homeRange === "week" ? renderHabitWeek(state) : habitsTab(state)) : renderTodosTab(state, drafts),
       completeBanner(state),
     ),
-    h("button", { class: "fab", dataset: { action: "openFab" }, "aria-label": "추가" }, "+"),
   );
 }

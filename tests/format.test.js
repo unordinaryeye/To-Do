@@ -3,7 +3,7 @@ import { repeatLabel, timeLabel, triggerLabel } from "../src/domain/format.js";
 import { weekOf, daysOfMonth, formatMonthKR, formatDateDots, isValidTime, isValidDateKey } from "../src/utils/date.js";
 import { monthlyStats, weeklyStats, greenLightStats } from "../src/domain/metrics.js";
 import { makePolicy } from "../src/domain/schedule.js";
-import { tagsInUse, habitsForDate } from "../src/state/selectors.js";
+import { tagsInUse, habitsForDate, habitMoveBounds } from "../src/state/selectors.js";
 import { defaultData } from "../src/domain/migrate.js";
 
 suite("format", (test) => {
@@ -125,5 +125,18 @@ suite("metrics: 리뷰 반영(초록불 규칙, 끝낸 루틴)", (test) => {
     const habits = { e: habit("e", [1, 2, 3, 4, 5, 6, 7], { endDate: "2026-02-01" }) };
     const s = weeklyStats(habits, {}, ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"], "2026-09-09");
     assertEqual(s.perHabit.length, 0);
+  });
+});
+
+suite("selectors: 시간순 자동 정렬", (test) => {
+  test("시간 있는 습관은 시간순으로 먼저, 나머지는 수동 순서. 설정으로 끌 수 있다", () => {
+    const data = defaultData("2026-09-09");
+    const withTime = (id, time) => ({ ...data.habits[id], policies: [{ ...data.habits[id].policies[0], trigger: { type: "time", value: time } }] });
+    const habits = { ...data.habits, r5: withTime("r5", "08:00"), r3: withTime("r3", "21:00"), r6: withTime("r6", "12:30") };
+    const d = { ...data, habits };
+    assertDeepEqual(habitsForDate(d, "2026-09-09").map((h) => h.id), ["r5", "r6", "r3", "r1", "r2", "r4"]);
+    assertDeepEqual(habitsForDate({ ...d, settings: { ...d.settings, sortByTime: false } }, "2026-09-09").map((h) => h.id), ["r1", "r2", "r3", "r4", "r5", "r6"]);
+    assertDeepEqual(habitMoveBounds(d, "r5", "2026-09-09"), { up: false, down: false, byTime: true });
+    assertDeepEqual(habitMoveBounds(d, "r2", "2026-09-09"), { up: true, down: true, byTime: false });
   });
 });

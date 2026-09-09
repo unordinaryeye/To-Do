@@ -2,7 +2,7 @@ import { EMOJI_OPTIONS, TAG_COLORS } from "../config.js";
 import { activeTags } from "../state/selectors.js";
 import { h } from "../utils/dom.js";
 import { ISO_DAYS_KR, isValidDateKey, isValidTime, compareKeys } from "../utils/date.js";
-import { REPEAT_PRESETS, TRIGGER_SUGGESTIONS, repeatLabel } from "../domain/format.js";
+import { REPEAT_PRESETS, TRIGGER_SUGGESTIONS, TIME_PRESETS, repeatLabel } from "../domain/format.js";
 import { page, chip } from "./parts.js";
 
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 7];
@@ -57,7 +57,11 @@ export function triggerEditor(values, drafts) {
   const seg = (id, label) => h("button", { class: type === id ? "on" : "", dataset: { action: "formTriggerType", triggerType: id } }, label);
   let body = null;
   if (type === "time") {
-    body = h("input", { class: "time-input", id: "triggerTimeField", type: "time", value: drafts.triggerTime, dataset: { draft: "triggerTime" }, "aria-label": "시간" });
+    body = h("div", null,
+      h("input", { class: "time-input", id: "triggerTimeField", type: "time", value: drafts.triggerTime, dataset: { draft: "triggerTime" }, "aria-label": "시간" }),
+      h("div", { class: "chips", style: { marginTop: "8px" } }, TIME_PRESETS.map((p) =>
+        chip(`${p.label} ${p.time}`, { small: true, on: drafts.triggerTime === p.time, dataset: { action: "formTimePreset", time: p.time } }))),
+    );
   } else if (type === "context") {
     body = h("div", null,
       h("input", { class: "text-input", id: "triggerTextField", value: drafts.triggerText, placeholder: "예) 출근길, 자기 전", maxlength: "12", dataset: { draft: "triggerText" } }),
@@ -68,6 +72,8 @@ export function triggerEditor(values, drafts) {
   return h("div", { class: "form-section" },
     h("div", { class: "k" }, "시간"),
     h("div", { class: "seg2" }, seg("none", "지정 안 함"), seg("time", "시간"), seg("context", "상황")),
+    type === "none" ? h("div", { class: "chips" }, TIME_PRESETS.map((p) =>
+      chip(`${p.label} ${p.time}`, { small: true, dataset: { action: "formTimePreset", time: p.time } }))) : null,
     body,
   );
 }

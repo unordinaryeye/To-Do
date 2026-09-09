@@ -1,4 +1,4 @@
-import { makePolicy, applySettingsFrom, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy, pausePolicies, resumePolicies } from "../domain/schedule.js";
+import { makePolicy, applySettingsFrom, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy, pausePolicies, resumePolicies, policyAt } from "../domain/schedule.js";
 import { addDays, compareKeys } from "../utils/date.js";
 import { quadrantRank } from "../domain/todo.js";
 import { newId } from "../utils/id.js";
@@ -132,9 +132,11 @@ function habitsReducer(habits, action) {
     case A.HABIT_DELETE: return habit ? without(habits, action.id) : habits;
     case A.HABIT_MOVE: {
       // 화면에 보이는 목록(선택일 예정 습관) 안에서 이웃과 바꾼다. date가 없으면 전체 목록.
-      const list = action.date
+      // 시간순 정렬 중(action.untimedOnly)이면 시간 없는 습관끼리만 바꾼다.
+      let list = action.date
         ? scheduledHabits(habits, action.date)
         : Object.values(habits).filter((h) => !h.deletedAt).sort((a, b) => a.order - b.order);
+      if (action.untimedOnly && action.date) list = list.filter((h) => policyAt(h, action.date)?.trigger?.type !== "time");
       return swapWithNeighbor(habits, list, action.id, action.dir);
     }
     default: return habits;

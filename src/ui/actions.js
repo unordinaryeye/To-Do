@@ -177,7 +177,10 @@ export function createActions({ store, sync, drafts }) {
       ui({ sheet: null });
       toast("✅", drafts.startDate > todayKey() ? "시작 날짜부터 적용돼요" : "오늘부터 적용돼요");
     },
-    moveHabit: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir), date: selected() }),
+    moveHabit: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir), date: selected(), untimedOnly: getState().data.settings.sortByTime !== false }),
+    setSortByTime: (el) => dispatch({ type: A.SETTINGS_SET, patch: { sortByTime: el.value === "on" } }),
+    formTimePreset: (el) => { drafts.triggerTime = el.dataset.time; patchForm({ triggerType: "time" }); },
+    openTagManage: () => ui({ sheet: { type: "tagManage" } }),
     moveHabitAll: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir) }),
     askEndHabit: (el) => ui({ sheet: { type: "confirmEndHabit", id: el.dataset.id } }),
     endHabit: (el) => { dispatch({ type: A.HABIT_END, id: el.dataset.id, date: addDays(todayKey(), -1) }); closeAll(); toast("⛔", "루틴을 끝냈어요. 내정보에서 다시 시작할 수 있어요"); },

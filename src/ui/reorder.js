@@ -69,7 +69,9 @@ export function renderReorder(state, _drafts, actions) {
   const list = h("div", { class: "reorder-list" }, habits.map((habit, i) => row(habit, i, habits.length, today, state.data.settings.clock24)));
   attachDrag(list, (ids) => actions?.reorderHabits(ids));
   return page("순서변경", {},
-    h("p", { class: "card-meta", style: { margin: "4px 0 14px" } }, "≡를 잡고 끌거나 ▲▼로 순서를 바꿔요. 바뀐 순서는 바로 저장돼요."),
+    h("p", { class: "card-meta", style: { margin: "4px 0 14px" } }, state.data.settings.sortByTime === false
+      ? "≡를 잡고 끌거나 ▲▼로 순서를 바꿔요. 바뀐 순서는 바로 저장돼요."
+      : "시간이 있는 루틴은 홈에서 시간순으로 먼저 보여요. 여기 순서는 시간 없는 루틴과 통계에 쓰여요. (내정보에서 자동 정렬을 끌 수 있어요)"),
     list,
   );
 }

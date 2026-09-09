@@ -2,7 +2,7 @@ import { h } from "../utils/dom.js";
 import { todayKey, formatDateDots } from "../utils/date.js";
 import { currentPolicy } from "../domain/schedule.js";
 import { repeatLabel, triggerLabel } from "../domain/format.js";
-import { habitMoveBounds, todoMoveBounds, endedHabits, pausedHabits } from "../state/selectors.js";
+import { habitMoveBounds, todoMoveBounds, endedHabits, pausedHabits, activeTags } from "../state/selectors.js";
 import { monthlyStats, habitStreak } from "../domain/metrics.js";
 import { addDays, weekOf } from "../utils/date.js";
 import { sheet, actionItem, confirmBox, listItem } from "./parts.js";
@@ -29,8 +29,10 @@ function habitActions(state, id) {
     habitSummary(habit, policy, state.data.settings.clock24),
     actionItem("수정하기", "✏️", { action: "openHabitForm", id }),
     actionItem("시간·반복 바꾸기", "🕒", { action: "openSchedule", id }),
-    actionItem("위로 이동", "▲", { action: "moveHabit", id, dir: "-1" }, { disabled: !bounds.up }),
-    actionItem("아래로 이동", "▼", { action: "moveHabit", id, dir: "1" }, { disabled: !bounds.down }),
+    bounds.byTime
+      ? actionItem("시간순으로 자동 정렬 중", "🕒", { action: "openSchedule", id }, { disabled: false })
+      : actionItem("위로 이동", "▲", { action: "moveHabit", id, dir: "-1" }, { disabled: !bounds.up }),
+    bounds.byTime ? null : actionItem("아래로 이동", "▼", { action: "moveHabit", id, dir: "1" }, { disabled: !bounds.down }),
     actionItem("월간 기록", "📊", { action: "openHabitRecord", id }),
     actionItem("복사하기", "📋", { action: "copyHabit", id }),
     actionItem("쉬어가기", "🛌", { action: "openPauseSheet", id }),
@@ -82,6 +84,23 @@ function quadrantPicker(state, id) {
     cell("none", "📥", "미분류", "아직 정하지 않음"),
     h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
   ], { title: todo.title, sub: "긴급·중요 여부로 사분면을 고릅니다" });
+}
+
+function tagManageSheet(state) {
+  const tags = activeTags(state.data);
+  return sheet([
+    tags.length
+      ? tags.map((tag) => listItem({
+        icon: tag.emoji, iconBg: `${tag.color}22`, main: tag.name, isStatic: true,
+        right: [
+          h("button", { class: "btn ghost sm", dataset: { action: "openTagForm", id: tag.id } }, "수정"),
+          h("button", { class: "btn danger-ghost sm", dataset: { action: "askDeleteTag", id: tag.id } }, "삭제"),
+        ],
+      }))
+      : h("div", { class: "empty-state" }, h("p", { class: "main" }, "목표 태그가 없어요")),
+    h("button", { class: "btn primary block", dataset: { action: "openTagForm" } }, "+ 새 목표 만들기"),
+    h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
+  ], { title: "목표 태그 관리", sub: "삭제해도 루틴은 남고 태그만 빠져요. 루틴에 태그를 붙이려면 루틴 수정 → 목표 태그." });
 }
 
 function tagActions(state, id) {
@@ -176,6 +195,7 @@ export function renderSheet(state, drafts) {
     case "emoji": return sheet([emojiGrid(state.ui.page?.values.emoji)], { title: "이모지 선택" });
     case "quadrant": return quadrantPicker(state, s.id);
     case "tagActions": return tagActions(state, s.id);
+    case "tagManage": return tagManageSheet(state);
     case "confirmDeleteTag": {
       const name = state.data.goalTags[s.id]?.name ?? "";
       return confirmBox([`"${name}" 목표를 삭제할까요?`, h("br"), "습관은 남고 이 태그만 사라져요."], "삭제", { action: "deleteTag", id: s.id });

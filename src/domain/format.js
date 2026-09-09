@@ -46,3 +46,10 @@ export const REPEAT_PRESETS = [
 ];
 
 export const TRIGGER_SUGGESTIONS = ["일어나자마자", "출근길", "점심 후", "퇴근 후", "자기 전"];
+
+export const TIME_PRESETS = [
+  { label: "아침", time: "07:00" },
+  { label: "점심", time: "12:00" },
+  { label: "저녁", time: "18:00" },
+  { label: "밤", time: "21:00" },
+];
