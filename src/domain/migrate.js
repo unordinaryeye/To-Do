@@ -1,6 +1,5 @@
-import { SCHEMA_VERSION, CATEGORIES, DEFAULT_ROUTINES, ALL_WEEKDAYS } from "../config.js";
+import { SCHEMA_VERSION, CATEGORIES, DEFAULT_ROUTINES, ALL_WEEKDAYS, LEGACY_START_DATE } from "../config.js";
 import { makePolicy } from "./schedule.js";
-import { compareKeys } from "../utils/date.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -15,6 +14,7 @@ export function emptyData() {
   };
 }
 
+/** 첫 설치 샘플. 예전 앱과 같이 과거 날짜에서도 보이도록 레거시 시작일을 쓴다. */
 export function defaultData(todayKey) {
   return migrateLegacy({ routines: DEFAULT_ROUTINES, checks: {}, todos: {} }, todayKey).data;
 }
@@ -24,10 +24,6 @@ function categoryTags() {
     c.id,
     { id: c.id, name: c.name, emoji: c.emoji, color: c.color, archived: false, mandala: null },
   ]));
-}
-
-function earliestCheckDate(checks) {
-  return Object.keys(checks).filter((k) => DATE_RE.test(k)).sort(compareKeys)[0] || null;
 }
 
 function legacyHabit(routine, index, startDate) {
@@ -95,12 +91,15 @@ function legacyTodos(todos, warnings) {
   return out;
 }
 
-/** v2(routines/checks/todos) → v3. 입력을 변경하지 않는다. */
-export function migrateLegacy(source, todayKey) {
+/**
+ * v2(routines/checks/todos) → v3. 입력을 변경하지 않는다.
+ * v2에는 생성일이 없으므로 예전 앱과 같이 모든 과거 날짜에 존재했던 것으로 본다(LEGACY_START_DATE).
+ * 기본 샘플처럼 "오늘 만든" 데이터는 startDate를 넘겨 오늘부터 시작한다.
+ */
+export function migrateLegacy(source, todayKey, { startDate = LEGACY_START_DATE } = {}) {
   const warnings = [];
   const routines = Array.isArray(source.routines) ? source.routines : [];
   const checks = legacyChecks(source.checks, warnings);
-  const startDate = earliestCheckDate(checks) || todayKey;
   const habits = {};
   routines.forEach((routine, index) => {
     if (!routine || routine.id == null) {
@@ -129,18 +128,41 @@ export function isLegacyShape(value) {
   return !!value && typeof value === "object" && Array.isArray(value.routines) && typeof value.checks === "object";
 }
 
-/** v3 데이터에 빠진 슬라이스를 채운다. 알 수 없는 슬라이스는 버리지 않고 보존한다. */
+const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+
+/** 습관 하나가 렌더/계산에 필요한 최소 형태를 갖추게 한다. 정책이 없으면 시작일부터 매일. */
+function sanitizeHabit(id, habit, index) {
+  const base = isObject(habit) ? habit : {};
+  const startDate = DATE_RE.test(base.startDate) ? base.startDate : LEGACY_START_DATE;
+  const policies = Array.isArray(base.policies) && base.policies.length
+    ? base.policies.filter((p) => isObject(p) && DATE_RE.test(p.effectiveFrom) && isObject(p.repeat) && Array.isArray(p.repeat.days))
+    : [];
+  return {
+    ...legacyHabit({ id, text: base.name, emoji: base.emoji, category: base.legacyCategory }, index, startDate),
+    ...base,
+    id,
+    name: typeof base.name === "string" ? base.name : "",
+    order: typeof base.order === "number" ? base.order : index,
+    policies: policies.length ? policies : [makePolicy(startDate, { repeat: { days: [...ALL_WEEKDAYS] } })],
+  };
+}
+
+/** v3 데이터에 빠진 슬라이스를 채우고 엔터티 형태를 검증한다. 알 수 없는 슬라이스는 보존한다. */
 export function normalizeV3(data) {
   const base = emptyData();
+  const source = isObject(data) ? data : {};
+  const habits = Object.fromEntries(
+    Object.entries(isObject(source.habits) ? source.habits : {}).map(([id, habit], i) => [id, sanitizeHabit(id, habit, i)]),
+  );
   return {
     ...base,
-    ...data,
-    settings: { ...base.settings, ...(data.settings || {}) },
-    habits: data.habits || {},
-    checks: data.checks || {},
-    todos: data.todos || {},
-    goalTags: data.goalTags || {},
-    routines: data.routines || {},
+    ...source,
+    settings: { ...base.settings, ...(isObject(source.settings) ? source.settings : {}) },
+    habits,
+    checks: isObject(source.checks) ? source.checks : {},
+    todos: isObject(source.todos) ? source.todos : {},
+    goalTags: isObject(source.goalTags) ? source.goalTags : {},
+    routines: isObject(source.routines) ? source.routines : {},
   };
 }
 

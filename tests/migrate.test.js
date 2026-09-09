@@ -1,6 +1,7 @@
 import { suite, assertEqual, assertDeepEqual, assertTrue } from "./harness.js";
-import { migrateLegacy, migrateAny, defaultData, isV3Envelope } from "../src/domain/migrate.js";
-import { SCHEMA_VERSION } from "../src/config.js";
+import { migrateLegacy, migrateAny, defaultData, isV3Envelope, normalizeV3 } from "../src/domain/migrate.js";
+import { isScheduled } from "../src/domain/schedule.js";
+import { SCHEMA_VERSION, LEGACY_START_DATE } from "../src/config.js";
 
 const TODAY = "2026-09-09";
 
@@ -28,19 +29,35 @@ suite("migrate: v2 → v3", (test) => {
     assertEqual(data.habits.r1.name, "물 한 잔");
   });
 
-  test("정책은 매일 반복, 시작일은 가장 이른 기록일", () => {
+  test("정책은 매일 반복, 시작일은 예전 앱처럼 '항상 있었던' 날짜", () => {
     const { data } = migrateLegacy(legacy(), TODAY);
     const habit = data.habits.r1;
-    assertEqual(habit.startDate, "2026-09-01");
+    assertEqual(habit.startDate, LEGACY_START_DATE);
     assertEqual(habit.policies.length, 1);
     assertDeepEqual(habit.policies[0].repeat.days, [1, 2, 3, 4, 5, 6, 7]);
     assertDeepEqual(habit.policies[0].goalTagIds, ["morning"]);
     assertEqual(habit.policies[0].status, "active");
   });
 
-  test("기록이 없으면 시작일은 오늘", () => {
-    const { data } = migrateLegacy({ routines: legacy().routines, checks: {}, todos: {} }, TODAY);
-    assertEqual(data.habits.r1.startDate, TODAY);
+  test("기본 샘플 데이터도 과거 날짜에 보인다(예전 앱과 동일)", () => {
+    assertEqual(defaultData(TODAY).habits.r1.startDate, LEGACY_START_DATE);
+  });
+
+  test("normalizeV3: 정책이 없거나 깨진 습관도 렌더 가능한 형태로 고친다", () => {
+    const data = normalizeV3({
+      habits: {
+        a: { id: "a", name: "정책 없음" },
+        b: { id: "b", name: "깨진 정책", policies: [{ effectiveFrom: "bad" }] },
+        c: null,
+      },
+      checks: "not an object",
+    });
+    assertEqual(data.habits.a.policies.length, 1);
+    assertDeepEqual(data.habits.a.policies[0].repeat.days, [1, 2, 3, 4, 5, 6, 7]);
+    assertEqual(data.habits.b.policies[0].effectiveFrom, LEGACY_START_DATE);
+    assertEqual(data.habits.c.name, "");
+    assertDeepEqual(data.checks, {});
+    assertTrue(isScheduled(data.habits.a, TODAY));
   });
 
   test("체크는 true→1, false는 버린다", () => {

@@ -3,6 +3,7 @@ import "./migrate.test.js";
 import "./schedule.test.js";
 import "./metrics.test.js";
 import "./reducers.test.js";
+import "./sync-docs.test.js";
 import { runAll } from "./harness.js";
 
 const { passed, failed } = await runAll(({ suite, name, ok, error }) => {

@@ -1,17 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 레거시(v2) 동기화 문서. 새 앱은 읽어서 이관만 하고 더 이상 쓰지 않는다.
+    // 레거시(v2) 동기화 문서. 새 앱은 읽어서 이관만 한다.
+    // 아직 업데이트하지 않은 예전 기기가 쓰고 있을 수 있어 update는 남겨 두고, 삭제만 막는다.
+    // 모든 기기가 v3로 넘어간 뒤에는 write 전체를 false로 바꿀 것.
     match /sync/{code} {
       allow read: if isCode(code);
-      allow write: if isCode(code);
+      allow create, update: if isCode(code);
+      allow delete: if false;
     }
 
-    // v3 워크스페이스. 코드(6자리)를 아는 기기만 접근한다는 현재 모델을 유지한다.
+    // v3 워크스페이스. "6자리 코드를 아는 기기만 접근"이라는 현재 모델을 그대로 유지한다.
+    // 인증이 없으므로 코드가 유출되면 읽고 쓸 수 있다. 삭제는 앱이 쓰지 않으므로 막아 피해 범위를 줄인다.
     match /workspaces/{code} {
-      allow read, write: if isCode(code);
+      allow read: if isCode(code);
+      allow create, update: if isCode(code) && request.resource.data.keys().hasOnly(['schemaVersion', 'updatedAt']);
+      allow delete: if false;
       match /data/{doc} {
-        allow read, write: if isCode(code) && validDoc(doc);
+        allow read: if isCode(code) && validDoc(doc);
+        allow create, update: if isCode(code) && validDoc(doc);
+        allow delete: if false;
       }
     }
 

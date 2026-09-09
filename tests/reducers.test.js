@@ -84,6 +84,18 @@ suite("reducers: 체크 / 습관 / 투두", (test) => {
     assertEqual(todosForDate(state.data, TODAY).length, 1);
   });
 
+  test("중간 삭제 후 추가해도 order가 겹치지 않아 이동이 된다", () => {
+    let state = freshState();
+    for (const title of ["a", "b", "c"]) state = rootReducer(state, { type: A.TODO_ADD, title, date: TODAY });
+    const b = todosForDate(state.data, TODAY)[1];
+    state = rootReducer(state, { type: A.TODO_DELETE, id: b.id });
+    state = rootReducer(state, { type: A.TODO_ADD, title: "d", date: TODAY });
+    const d = todosForDate(state.data, TODAY)[2];
+    assertEqual(d.order, 3);
+    state = rootReducer(state, { type: A.TODO_MOVE, id: d.id, dir: -1 });
+    assertDeepEqual(todosForDate(state.data, TODAY).map((t) => t.title), ["a", "d", "c"]);
+  });
+
   test("원격 패치는 슬라이스 단위로 덮어쓴다", () => {
     const state = freshState();
     const next = rootReducer(state, { type: A.DATA_APPLY_REMOTE, patch: { checks: { [TODAY]: { r1: 1 } } } });

@@ -82,7 +82,7 @@ function todosOfDate(todos, date) {
 function todosReducer(todos, action) {
   switch (action.type) {
     case A.TODO_ADD: {
-      const order = todosOfDate(todos, action.date).length;
+      const order = todosOfDate(todos, action.date).reduce((max, t) => Math.max(max, t.order), -1) + 1;
       const id = newId("t");
       return {
         ...todos,

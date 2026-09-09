@@ -19,7 +19,9 @@ export function createStore(reducer, initialState) {
         const updated = reducer(prev, next);
         if (updated === prev) continue;
         state = updated;
-        listeners.forEach((listener) => listener(state, prev, next));
+        for (const listener of listeners) {
+          try { listener(state, prev, next); } catch (error) { console.error("구독자 오류:", error); }
+        }
       }
     } finally {
       dispatching = false;

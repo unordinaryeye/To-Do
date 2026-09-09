@@ -25,7 +25,7 @@ function syncSection(ui, draft) {
     h("div", { class: "sec-title" }, "🔗 기기 동기화"),
     h("button", { class: "sync-btn sync-btn-primary", dataset: { action: "createSync" } }, "새 코드 생성"),
     h("div", { class: "sync-or" }, h("div", { class: "line" }), h("span", null, "또는 코드 입력"), h("div", { class: "line" })),
-    h("input", { class: "sync-input", placeholder: "6자리 코드", maxlength: "6", value: draft, dataset: { draft: "sync", enter: "joinSync" } }),
+    h("input", { class: "sync-input", id: "syncCodeField", placeholder: "6자리 코드", maxlength: "6", value: draft, dataset: { draft: "sync", enter: "joinSync" } }),
     h("button", { class: "sync-btn sync-btn-secondary", dataset: { action: "joinSync" } }, "연결"),
   );
 }

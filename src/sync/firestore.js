@@ -1,53 +1,18 @@
 import { SCHEMA_VERSION, SYNC_DEBOUNCE_MS } from "../config.js";
 import { migrateLegacy, normalizeV3 } from "../domain/migrate.js";
-import { monthKey } from "../utils/date.js";
+import { snapshotOf, emptyDocFor, payloadFor, patchFromDoc, assembleData } from "./docs.js";
 
-const HABITS_DOC = "habits";
-const ENTITY_SLICES = ["habits", "goalTags", "routines"];
-
-const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-
-// ── 데이터 ↔ 문서 변환 ──
-
-function monthsOf(data) {
-  const months = new Set();
-  Object.values(data.todos).forEach((t) => months.add(monthKey(t.date)));
-  Object.keys(data.checks).forEach((date) => months.add(monthKey(date)));
-  return months;
+export class SyncError extends Error {
+  constructor(code, message) { super(message); this.code = code; }
 }
 
-function todosOfMonth(data, month) {
-  return Object.fromEntries(Object.entries(data.todos).filter(([, t]) => monthKey(t.date) === month));
-}
+const SERVER = { source: "server" };
 
-function checksOfMonth(data, month) {
-  return Object.fromEntries(Object.entries(data.checks).filter(([date]) => monthKey(date) === month));
-}
-
-function habitsDocOf(data) {
-  return { habits: data.habits, goalTags: data.goalTags, routines: data.routines, settings: data.settings };
-}
-
-/** 두 맵을 비교해 merge 페이로드를 만든다. 사라진 키는 FieldValue.delete(). */
-function diffMap(prev = {}, next = {}, deleteValue, depth = 1) {
-  const out = {};
-  for (const [key, value] of Object.entries(next)) {
-    if (depth > 1 && typeof value === "object" && value !== null) {
-      const nested = diffMap(prev[key] || {}, value, deleteValue, depth - 1);
-      if (Object.keys(nested).length) out[key] = nested;
-    } else if (!same(prev[key], value)) {
-      out[key] = value;
-    }
-  }
-  for (const key of Object.keys(prev)) {
-    if (!(key in next)) out[key] = deleteValue;
-  }
-  return out;
-}
-
-// ── 동기화 엔진 ──
-
-export function createSync({ firebase, config, getData, applyRemote, onStatus }) {
+/**
+ * 동기화 엔진. 구독(onSnapshot)은 오프라인에서도 먼저 걸고, 서버 확인이 필요한 일(워크스페이스 생성,
+ * 레거시 이관, 코드 존재 확인)만 source:"server" 읽기로 한다. 캐시 미스를 "원격 없음"으로 오해하지 않는다.
+ */
+export function createSync({ firebase, config, getData, applyRemote, onStatus, todayKey }) {
   let db = null;
   let ready = false;
   try {
@@ -61,103 +26,94 @@ export function createSync({ firebase, config, getData, applyRemote, onStatus })
   let code = "";
   let unsubscribe = null;
   let timer = null;
-  let synced = null; // 마지막으로 원격과 일치했다고 아는 문서별 내용
+  let synced = null;      // 문서 id → 마지막으로 원격과 일치한 내용. null이면 아직 원격 상태를 모름
+  let bootstrapping = false;
 
   const deleteValue = () => firebase.firestore.FieldValue.delete();
   const stamp = () => firebase.firestore.FieldValue.serverTimestamp();
-  const dataCol = (ws) => db.collection("workspaces").doc(ws).collection("data");
+  const wsDoc = (ws) => db.collection("workspaces").doc(ws);
+  const dataCol = (ws) => wsDoc(ws).collection("data");
+  const bodyOf = (doc) => { const { updatedAt: _ts, ...body } = doc.data(); return body; };
 
-  function snapshotOf(data) {
-    const docs = { [HABITS_DOC]: habitsDocOf(data) };
-    for (const month of monthsOf(data)) {
-      docs[`todos-${month}`] = { todos: todosOfMonth(data, month) };
-      docs[`checks-${month}`] = { checks: checksOfMonth(data, month) };
+  // ── 서버 읽기 ──
+
+  async function assertSchema(ws) {
+    const meta = await wsDoc(ws).get(SERVER);
+    const version = meta.exists ? meta.data().schemaVersion : null;
+    if (version && version > SCHEMA_VERSION) {
+      throw new SyncError("schema-too-new", "다른 기기의 앱이 더 새 버전이에요. 앱을 업데이트해 주세요");
     }
-    return docs;
+  }
+
+  /** 서버에서 워크스페이스 전체를 읽는다. 없으면 null, 오프라인이면 throw. */
+  async function readWorkspace(ws) {
+    await assertSchema(ws);
+    const col = await dataCol(ws).get(SERVER);
+    if (col.empty) return null;
+    const docs = [];
+    col.forEach((doc) => docs.push({ id: doc.id, body: bodyOf(doc) }));
+    return normalizeV3(assembleData(docs, normalizeV3({})));
+  }
+
+  /** 레거시 sync/{code} 문서를 서버에서 읽어 v3로 변환. 없으면 null. */
+  async function readLegacy(ws) {
+    const snap = await db.collection("sync").doc(ws).get(SERVER);
+    if (!snap.exists || !Array.isArray(snap.data().routines)) return null;
+    const legacy = snap.data();
+    return migrateLegacy({ routines: legacy.routines, checks: legacy.checks || {}, todos: legacy.todos || {} }, todayKey()).data;
   }
 
   async function writeAll(ws, data) {
     const batch = db.batch();
-    batch.set(db.collection("workspaces").doc(ws), { schemaVersion: SCHEMA_VERSION, updatedAt: stamp() }, { merge: true });
+    batch.set(wsDoc(ws), { schemaVersion: SCHEMA_VERSION, updatedAt: stamp() }, { merge: true });
     const docs = snapshotOf(data);
-    for (const [id, body] of Object.entries(docs)) {
-      batch.set(dataCol(ws).doc(id), { ...body, updatedAt: stamp() });
-    }
+    for (const [id, body] of Object.entries(docs)) batch.set(dataCol(ws).doc(id), { ...body, updatedAt: stamp() });
     await batch.commit();
     synced = docs;
   }
 
-  /** 원격 문서 하나를 로컬 data에 반영한 patch를 만든다. */
-  function patchFromDoc(id, body, data) {
-    if (id === HABITS_DOC) {
-      const patch = {};
-      for (const slice of [...ENTITY_SLICES, "settings"]) {
-        if (body[slice] && !same(body[slice], data[slice])) patch[slice] = body[slice];
-      }
-      return patch;
+  // ── 수신 ──
+
+  /** 서버가 "문서 없음"을 확인해 줬을 때만 워크스페이스를 만든다(레거시 이관 또는 로컬 업로드). */
+  async function bootstrap(ws) {
+    if (bootstrapping || synced) return;
+    bootstrapping = true;
+    try {
+      const legacy = await readLegacy(ws);
+      await writeAll(ws, legacy || getData());
+      if (legacy) applyRemote(legacy);
+    } catch (error) {
+      console.error("워크스페이스 생성 실패:", error);
+    } finally {
+      bootstrapping = false;
     }
-    if (id.startsWith("todos-")) {
-      const month = id.slice(6);
-      const remote = body.todos || {};
-      if (same(remote, todosOfMonth(data, month))) return {};
-      const kept = Object.fromEntries(Object.entries(data.todos).filter(([, t]) => monthKey(t.date) !== month));
-      return { todos: { ...kept, ...remote } };
-    }
-    if (id.startsWith("checks-")) {
-      const month = id.slice(7);
-      const remote = body.checks || {};
-      if (same(remote, checksOfMonth(data, month))) return {};
-      const kept = Object.fromEntries(Object.entries(data.checks).filter(([date]) => monthKey(date) !== month));
-      return { checks: { ...kept, ...remote } };
-    }
-    return {};
   }
 
-  function handleSnapshot(snapshot) {
-    let data = getData();
+  function handleSnapshot(ws, snapshot) {
+    if (snapshot.empty && !snapshot.metadata.fromCache && !synced) { bootstrap(ws); return; }
+    const data = getData();
     let merged = {};
     for (const change of snapshot.docChanges()) {
       if (change.doc.metadata.hasPendingWrites) continue;
-      const { updatedAt: _ts, ...body } = change.doc.data();
-      const id = change.doc.id;
-      synced = { ...(synced || {}), [id]: body };
+      const body = bodyOf(change.doc);
+      synced = { ...(synced || {}), [change.doc.id]: body };
       if (change.type === "removed") continue;
-      const patch = patchFromDoc(id, body, { ...data, ...merged });
-      merged = { ...merged, ...patch };
+      merged = { ...merged, ...patchFromDoc(change.doc.id, body, { ...data, ...merged }) };
     }
     if (Object.keys(merged).length) applyRemote(merged);
   }
 
   function listen(ws) {
     if (unsubscribe) unsubscribe();
+    code = ws;
     unsubscribe = dataCol(ws).onSnapshot(
-      (snapshot) => { onStatus(true); handleSnapshot(snapshot); },
+      { includeMetadataChanges: false },
+      (snapshot) => { onStatus(!snapshot.metadata.fromCache); handleSnapshot(ws, snapshot); },
       (error) => { console.error("동기화 수신 오류:", error); onStatus(false); },
     );
   }
 
-  /** 레거시 sync/{code} 문서가 있으면 v3로 변환해 돌려준다. */
-  async function readLegacy(ws, todayKey) {
-    const snap = await db.collection("sync").doc(ws).get();
-    if (!snap.exists) return null;
-    const legacy = snap.data();
-    if (!Array.isArray(legacy.routines)) return null;
-    return migrateLegacy({ routines: legacy.routines, checks: legacy.checks || {}, todos: legacy.todos || {} }, todayKey).data;
-  }
-
-  /** 워크스페이스 전체를 읽어 v3 데이터로 조립한다. 없으면 null. */
-  async function readWorkspace(ws) {
-    const col = await dataCol(ws).get();
-    if (col.empty) return null;
-    const data = normalizeV3({});
-    col.forEach((doc) => {
-      const { updatedAt: _ts, ...body } = doc.data();
-      if (doc.id === HABITS_DOC) Object.assign(data, body);
-      else if (body.todos) Object.assign(data.todos, body.todos);
-      else if (body.checks) Object.assign(data.checks, body.checks);
-    });
-    return normalizeV3(data);
-  }
+  // ── 송신 ──
 
   function schedulePush() {
     clearTimeout(timer);
@@ -170,12 +126,10 @@ export function createSync({ firebase, config, getData, applyRemote, onStatus })
     const docs = snapshotOf(getData());
     const batch = db.batch();
     let writes = 0;
-    const ids = new Set([...Object.keys(docs), ...Object.keys(synced)]);
-    for (const id of ids) {
-      const next = docs[id];
-      const prev = synced[id];
-      if (!next) continue; // 월 문서가 통째로 비면 그대로 둔다(빈 맵으로 덮어쓰지 않음)
-      const payload = payloadFor(id, prev, next);
+    for (const id of new Set([...Object.keys(docs), ...Object.keys(synced)])) {
+      const next = docs[id] || emptyDocFor(id);
+      if (!next) continue;
+      const payload = payloadFor(id, synced[id], next, deleteValue());
       if (!payload) continue;
       batch.set(dataCol(ws).doc(id), { ...payload, updatedAt: stamp() }, { merge: true });
       writes++;
@@ -185,61 +139,33 @@ export function createSync({ firebase, config, getData, applyRemote, onStatus })
     if (code === ws) synced = { ...synced, ...docs };
   }
 
-  function payloadFor(id, prev, next) {
-    if (!prev) return next;
-    if (same(prev, next)) return null;
-    if (id === HABITS_DOC) {
-      const payload = {};
-      for (const slice of ENTITY_SLICES) {
-        const diff = diffMap(prev[slice], next[slice], deleteValue());
-        if (Object.keys(diff).length) payload[slice] = diff;
-      }
-      if (!same(prev.settings, next.settings)) payload.settings = next.settings;
-      return Object.keys(payload).length ? payload : null;
-    }
-    if (id.startsWith("todos-")) return { todos: diffMap(prev.todos, next.todos, deleteValue()) };
-    if (id.startsWith("checks-")) return { checks: diffMap(prev.checks, next.checks, deleteValue(), 2) };
-    return null;
-  }
-
   return {
     ready,
     get code() { return code; },
 
-    /** 로컬 데이터로 새 워크스페이스를 만들고 연결한다. */
+    /** 로컬 데이터로 새 워크스페이스를 만들고 연결한다. 온라인이어야 한다. */
     async create(ws, data) {
       await writeAll(ws, data);
-      code = ws;
       listen(ws);
     },
 
-    /** 기존 코드에 연결한다. 원격 데이터(v3 또는 레거시 변환)를 돌려준다. 없으면 null. */
-    async join(ws, todayKey) {
+    /** 기존 코드에 연결. 원격 데이터(v3 또는 레거시 변환)를 돌려주고, 코드가 없으면 null. 오프라인이면 throw. */
+    async join(ws) {
       let data = await readWorkspace(ws);
       if (!data) {
-        data = await readLegacy(ws, todayKey);
+        data = await readLegacy(ws);
         if (!data) return null;
         await writeAll(ws, data);
+      } else {
+        synced = snapshotOf(data);
       }
-      code = ws;
       listen(ws);
       return data;
     },
 
-    /** 앱 시작 시 저장된 코드로 재연결. 원격에 아직 v3가 없으면 로컬 데이터로 만든다. */
-    async resume(ws, localData, todayKey) {
-      const remote = await readWorkspace(ws);
-      if (!remote) {
-        const legacy = await readLegacy(ws, todayKey);
-        await writeAll(ws, legacy || localData);
-        code = ws;
-        listen(ws);
-        return legacy;
-      }
-      synced = snapshotOf(remote);
-      code = ws;
+    /** 앱 시작 시 저장된 코드로 재연결. 오프라인이어도 구독을 걸어 두고, 서버 응답이 오면 상태를 맞춘다. */
+    resume(ws) {
       listen(ws);
-      return remote;
     },
 
     disconnect() {

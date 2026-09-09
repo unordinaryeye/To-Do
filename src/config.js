@@ -17,6 +17,8 @@ export const SYNC_DEBOUNCE_MS = 500;
 export const BACKUP_REMINDER_DAYS = 7;
 
 export const ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
+/** v2에는 습관 생성일이 없다. 예전 앱처럼 "항상 있었던" 것으로 취급하기 위한 시작일. */
+export const LEGACY_START_DATE = "2000-01-01";
 
 /** 현재 UI가 쓰는 카테고리. 마이그레이션 시 같은 id/이모지/색으로 목표 태그가 만들어진다. */
 export const CATEGORIES = [
