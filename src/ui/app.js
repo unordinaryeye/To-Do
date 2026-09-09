@@ -11,7 +11,7 @@ import { renderSettings } from "./settings.js";
 import { renderHabitForm, renderTodoForm, renderTagForm } from "./forms.js";
 import { renderSheet } from "./sheets.js";
 import { renderReorder } from "./reorder.js";
-import { renderMandalaPage, renderMandalaFull } from "./mandala.js";
+import { renderMandalartPage, renderMandalartFull } from "./mandala.js";
 import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 
 /** 입력 중인 값(비제어). store 밖에 두어 타이핑·피커 조작마다 재렌더하지 않는다. */
@@ -22,7 +22,7 @@ const drafts = {
 };
 
 const SCREENS = { home: renderHome, stats: renderStats, goals: renderGoals, settings: renderSettings };
-const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm, reorder: renderReorder, mandala: renderMandalaPage, mandalaFull: renderMandalaFull };
+const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm, tagForm: renderTagForm, reorder: renderReorder, mandalart: renderMandalartPage, mandalartFull: renderMandalartFull };
 const IME_KEYCODE = 229;
 
 let layerWasOpen = false;

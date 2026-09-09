@@ -11,6 +11,7 @@ export function emptyData() {
     todos: {},
     goalTags: {},
     routines: {},
+    mandalarts: {},
   };
 }
 
@@ -163,6 +164,7 @@ export function normalizeV3(data) {
     todos: isObject(source.todos) ? source.todos : {},
     goalTags: isObject(source.goalTags) ? source.goalTags : {},
     routines: isObject(source.routines) ? source.routines : {},
+    mandalarts: isObject(source.mandalarts) ? source.mandalarts : {},
   };
 }
 

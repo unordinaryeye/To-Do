@@ -1,7 +1,7 @@
 import { makePolicy, applySettingsFrom, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy, pausePolicies, resumePolicies, policyAt } from "../domain/schedule.js";
 import { addDays, compareKeys } from "../utils/date.js";
 import { quadrantRank } from "../domain/todo.js";
-import { setSectorText, setActionText, linkHabit, unlinkEverywhere } from "../domain/mandala.js";
+import { placeTag, normalizeMandalart } from "../domain/mandala.js";
 import { newId } from "../utils/id.js";
 
 // ── 액션 타입 ──
@@ -22,9 +22,9 @@ export const A = {
   TODO_DELETE: "todo/delete",
   TODO_MOVE: "todo/move",
   TAG_UPSERT: "tag/upsert",
-  MANDALA_SECTOR: "mandala/sector",
-  MANDALA_ACTION: "mandala/action",
-  MANDALA_LINK: "mandala/link",
+  MANDALART_UPSERT: "mandalart/upsert",
+  MANDALART_DELETE: "mandalart/delete",
+  MANDALART_PLACE: "mandalart/place",
   TAG_DELETE: "tag/delete",
   SETTINGS_SET: "settings/set",
   DATA_REPLACE: "data/replace",
@@ -223,40 +223,47 @@ function tagsReducer(goalTags, action) {
       const tag = goalTags[action.id];
       return tag ? { ...goalTags, [action.id]: { ...tag, archived: true } } : goalTags;
     }
-    case A.MANDALA_SECTOR:
-    case A.MANDALA_ACTION:
-    case A.MANDALA_LINK: {
-      const tag = goalTags[action.tagId];
-      if (!tag) return goalTags;
-      const next = action.type === A.MANDALA_SECTOR ? setSectorText(tag.mandala, action.sector, action.text)
-        : action.type === A.MANDALA_ACTION ? setActionText(tag.mandala, action.sector, action.action, action.text)
-        : linkHabit(tag.mandala, action.sector, action.action, action.habitId, action.on);
-      return { ...goalTags, [action.tagId]: { ...tag, mandala: next } };
-    }
     default: return goalTags;
+  }
+}
+
+function mandalartsReducer(mandalarts, action) {
+  switch (action.type) {
+    case A.MANDALART_UPSERT: {
+      const id = action.id || newId("m");
+      const existing = mandalarts[id];
+      return { ...mandalarts, [id]: normalizeMandalart({ ...(existing || {}), id, title: action.title, emoji: action.emoji }) };
+    }
+    case A.MANDALART_DELETE: return mandalarts[action.id] ? without(mandalarts, action.id) : mandalarts;
+    case A.MANDALART_PLACE: {
+      const m = mandalarts[action.id];
+      return m ? { ...mandalarts, [action.id]: placeTag(m, action.slot, action.tagId || null) } : mandalarts;
+    }
+    default: return mandalarts;
   }
 }
 
 function dataReducer(data, action) {
   switch (action.type) {
     case A.TAG_UPSERT:
-    case A.TAG_DELETE:
-    case A.MANDALA_SECTOR:
-    case A.MANDALA_ACTION:
-    case A.MANDALA_LINK: {
+    case A.TAG_DELETE: {
       const goalTags = tagsReducer(data.goalTags, action);
-      return goalTags === data.goalTags ? data : { ...data, goalTags };
+      if (goalTags === data.goalTags) return data;
+      // 삭제(보관)된 목표는 만다라트 칸에서도 뺀다
+      const mandalarts = action.type === A.TAG_DELETE
+        ? Object.fromEntries(Object.entries(data.mandalarts || {}).map(([id, m]) => [id, m.slots?.includes(action.id) ? placeTag(m, -1, action.id) : m]))
+        : data.mandalarts;
+      return { ...data, goalTags, mandalarts };
     }
     case A.DATA_REPLACE: return action.data;
     case A.DATA_APPLY_REMOTE: return { ...data, ...action.patch };
     case A.CHECK_TOGGLE: return { ...data, checks: toggleCheck(data.checks, action) };
     case A.SETTINGS_SET: return { ...data, settings: { ...data.settings, ...action.patch } };
-    case A.HABIT_DELETE: {
-      const habits = habitsReducer(data.habits, action);
-      if (habits === data.habits) return data;
-      // 만다라트 칸에 남은 링크도 함께 정리
-      const goalTags = Object.fromEntries(Object.entries(data.goalTags).map(([id, tag]) => [id, tag.mandala ? { ...tag, mandala: unlinkEverywhere(tag.mandala, action.id) } : tag]));
-      return { ...data, habits, goalTags };
+    case A.MANDALART_UPSERT:
+    case A.MANDALART_DELETE:
+    case A.MANDALART_PLACE: {
+      const mandalarts = mandalartsReducer(data.mandalarts || {}, action);
+      return mandalarts === data.mandalarts ? data : { ...data, mandalarts };
     }
     default: {
       const habits = habitsReducer(data.habits, action);
@@ -283,6 +290,7 @@ export function initialUi({ today, syncCode, firebaseReady, route = "home" }) {
     statsTab: "month",   // month | week | green
     statsDate: today,    // 주간 통계 기준일
     recordMonth: today.slice(0, 7), // 월간 기록 시트의 달
+    emojiFor: null,      // 이모지 시트가 돌아갈 시트
     filterTagId: null,
     page: null,          // { type: 'habitForm'|'todoForm', values } 전체 화면
     sheet: null,         // { type, ... } 바텀시트

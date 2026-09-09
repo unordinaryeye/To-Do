@@ -264,3 +264,7 @@
 .wk-cell.partial{color:var(--yellow)}
 .wk-check.partial{background:var(--yellow-soft);border-color:var(--yellow);font-size:10px;font-family:var(--font-num)}
 .mx-cell.q3{background:var(--yellow-soft)}
+
+.section-title{font-size:16px;font-weight:700;padding:6px 0}
+.md-cell.done{border-color:var(--accent)}
+.md-cell.done .md-text::after{content:" ✓";color:var(--accent)}

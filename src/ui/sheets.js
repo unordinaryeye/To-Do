@@ -7,7 +7,7 @@ import { monthlyStats, habitStreak } from "../domain/metrics.js";
 import { addDays, weekOf } from "../utils/date.js";
 import { sheet, actionItem, confirmBox, listItem } from "./parts.js";
 import { scheduleEditor, emojiGrid } from "./forms.js";
-import { sectorSheet, cellSheet, linkSheet } from "./mandala.js";
+import { titleSheet, slotPickerSheet } from "./mandala.js";
 import { QUADRANTS, quadrantOf } from "../domain/todo.js";
 
 function habitSummary(habit, policy, clock24) {
@@ -109,7 +109,6 @@ function tagActions(state, id) {
   if (!tag) return null;
   return sheet([
     h("div", { class: "sheet-summary" }, h("span", { class: "emoji" }, tag.emoji), h("div", null, h("div", { class: "name" }, tag.name))),
-    actionItem("만다라트 열기", "🔲", { action: "openMandala", tagId: id }),
     actionItem("수정하기", "✏️", { action: "openTagForm", id }),
     actionItem("삭제하기", "🗑", { action: "askDeleteTag", id }, { danger: true }),
     h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
@@ -194,13 +193,16 @@ export function renderSheet(state, drafts) {
     case "habitActions": return habitActions(state, s.id);
     case "todoActions": return todoActions(state, s.id);
     case "schedule": return scheduleSheet(state, drafts);
-    case "emoji": return sheet([emojiGrid(state.ui.page?.values.emoji)], { title: "이모지 선택" });
+    case "emoji": return sheet([emojiGrid(state.ui.page?.values?.emoji ?? state.ui.emojiFor?.emoji)], { title: "이모지 선택" });
     case "quadrant": return quadrantPicker(state, s.id);
     case "tagActions": return tagActions(state, s.id);
     case "tagManage": return tagManageSheet(state);
-    case "mandalaSector": return sectorSheet(state, drafts);
-    case "mandalaCell": return cellSheet(state, drafts);
-    case "mandalaLink": return linkSheet(state);
+    case "mandalartTitle": return titleSheet(state, drafts);
+    case "slotPicker": return slotPickerSheet(state);
+    case "confirmDeleteMandalart": {
+      const name = state.data.mandalarts?.[s.id]?.title ?? "";
+      return confirmBox([`"${name}" 만다라트를 삭제할까요?`, h("br"), "목표 태그와 루틴은 그대로 남아요."], "삭제", { action: "deleteMandalart", id: s.id });
+    }
     case "confirmDeleteTag": {
       const name = state.data.goalTags[s.id]?.name ?? "";
       return confirmBox([`"${name}" 목표를 삭제할까요?`, h("br"), "습관은 남고 이 태그만 사라져요."], "삭제", { action: "deleteTag", id: s.id });

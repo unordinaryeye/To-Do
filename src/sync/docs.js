@@ -9,7 +9,7 @@
 import { monthKey } from "../utils/date.js";
 
 export const HABITS_DOC = "habits";
-const ENTITY_SLICES = ["habits", "goalTags", "routines"];
+const ENTITY_SLICES = ["habits", "goalTags", "routines", "mandalarts"];
 
 /** 키 순서에 상관없이 같은 내용이면 같은 문자열. */
 export function stableStringify(value) {
@@ -37,7 +37,7 @@ export function checksOfMonth(data, month) {
 }
 
 export function habitsDocOf(data) {
-  return { habits: data.habits, goalTags: data.goalTags, routines: data.routines, settings: data.settings };
+  return { habits: data.habits, goalTags: data.goalTags, routines: data.routines, mandalarts: data.mandalarts || {}, settings: data.settings };
 }
 
 /** 로컬 데이터를 문서 id → 내용 맵으로. */

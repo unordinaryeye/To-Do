@@ -1,6 +1,9 @@
 /**
- * 만다라트(9×9): 중앙 핵심목표(=목표 태그) + 세부목표 8개 + 각 실천항목 8개 = 원본 73칸.
- * goalTags[id].mandala = { sectors: [ { text, actions: [ { text, habitIds: [] } ×8 ] } ×8 ] }
+ * 만다라트 3단 스택: 만다라트(핵심 목표) → 8칸의 목표 태그 → 각 목표 안 8칸의 루틴.
+ * 만다라트 문서는 제목과 "어느 칸에 어떤 목표를 놓았는지"만 저장한다.
+ * 목표 안의 루틴은 그 태그가 붙은 활성 습관(표시 순서)에서 파생된다.
+ *
+ * data.mandalarts[id] = { id, title, emoji, slots: [tagId|null ×8] }
  * slot 순서(0..7): 좌상, 상, 우상, 좌, 우, 좌하, 하, 우하
  */
 export const SLOT_COUNT = 8;
@@ -8,109 +11,47 @@ export const SLOT_COUNT = 8;
 /** 3×3 격자에서 slot → 칸 위치(0..8, 4가 중앙) */
 export const SLOT_TO_CELL = [0, 1, 2, 3, 5, 6, 7, 8];
 
-export function emptyAction() {
-  return { text: "", habitIds: [] };
+export function emptySlots() {
+  return Array.from({ length: SLOT_COUNT }, () => null);
 }
 
-export function emptySector() {
-  return { text: "", actions: Array.from({ length: SLOT_COUNT }, emptyAction) };
+/** 저장된 만다라트가 깨져 있어도 항상 slots 8칸을 보장한다. */
+export function normalizeMandalart(m) {
+  const slots = emptySlots().map((_, i) => (Array.isArray(m?.slots) && typeof m.slots[i] === "string" ? m.slots[i] : null));
+  return { id: m?.id ?? "", title: typeof m?.title === "string" ? m.title : "", emoji: typeof m?.emoji === "string" ? m.emoji : "🎯", slots };
 }
 
-export function emptyMandala() {
-  return { sectors: Array.from({ length: SLOT_COUNT }, emptySector) };
+/** 칸에 목표를 놓는다. 다른 칸에 이미 있던 같은 목표는 비운다. */
+export function placeTag(m, slot, tagId) {
+  const base = normalizeMandalart(m);
+  const slots = base.slots.map((id, i) => (i === slot ? tagId : id === tagId ? null : id));
+  return { ...base, slots };
 }
 
-/** 저장된 만다라트가 없거나 깨져 있어도 항상 8×8 형태로 돌려준다. */
-export function normalizeMandala(mandala) {
-  const base = emptyMandala();
-  if (!mandala || !Array.isArray(mandala.sectors)) return base;
-  return {
-    sectors: base.sectors.map((sector, i) => {
-      const src = mandala.sectors[i];
-      if (!src || typeof src !== "object") return sector;
-      return {
-        text: typeof src.text === "string" ? src.text : "",
-        actions: sector.actions.map((action, j) => {
-          const a = Array.isArray(src.actions) ? src.actions[j] : null;
-          if (!a || typeof a !== "object") return action;
-          return { text: typeof a.text === "string" ? a.text : "", habitIds: Array.isArray(a.habitIds) ? a.habitIds.filter((x) => typeof x === "string") : [] };
-        }),
-      };
-    }),
-  };
+/** 목표 태그 하나에 들어갈 루틴 8칸: 그 태그가 붙은 습관을 표시 순서대로 앞 8개. 넘치면 rest에 담는다. */
+export function habitsForSector(habits, tagId) {
+  const list = habits.filter((h) => (h.goalTagIds || []).includes(tagId));
+  return { cells: emptySlots().map((_, i) => list[i] ?? null), rest: list.slice(SLOT_COUNT) };
 }
 
-const replaceAt = (arr, index, value) => arr.map((item, i) => (i === index ? value : item));
-
-/** 저장용 압축: 빈 실천항목/세부목표는 null, 전부 비면 null. normalizeMandala가 다시 펼친다. */
-export function compactMandala(mandala) {
-  const m = normalizeMandala(mandala);
-  const sectors = m.sectors.map((s) => {
-    const actions = s.actions.map((a) => (a.text.trim() || a.habitIds.length ? a : null));
-    return s.text.trim() || actions.some(Boolean) ? { text: s.text, actions } : null;
-  });
-  return sectors.some(Boolean) ? { sectors } : null;
-}
-
-/** 삭제된 습관 id를 모든 칸에서 제거 */
-export function unlinkEverywhere(mandala, habitId) {
-  if (!mandala) return mandala;
-  const m = normalizeMandala(mandala);
-  return compactMandala({ sectors: m.sectors.map((s) => ({ ...s, actions: s.actions.map((a) => ({ ...a, habitIds: a.habitIds.filter((id) => id !== habitId) })) })) });
-}
-
-export function setSectorText(mandala, sector, text) {
-  const m = normalizeMandala(mandala);
-  return compactMandala({ sectors: replaceAt(m.sectors, sector, { ...m.sectors[sector], text }) });
-}
-
-export function setActionText(mandala, sector, action, text) {
-  const m = normalizeMandala(mandala);
-  const s = m.sectors[sector];
-  return compactMandala({ sectors: replaceAt(m.sectors, sector, { ...s, actions: replaceAt(s.actions, action, { ...s.actions[action], text }) }) });
-}
-
-export function linkHabit(mandala, sector, action, habitId, on) {
-  const m = normalizeMandala(mandala);
-  const s = m.sectors[sector];
-  const a = s.actions[action];
-  const habitIds = on ? [...new Set([...a.habitIds, habitId])] : a.habitIds.filter((id) => id !== habitId);
-  return compactMandala({ sectors: replaceAt(m.sectors, sector, { ...s, actions: replaceAt(s.actions, action, { ...a, habitIds }) }) });
-}
-
-/** 습관 id → 연결된 칸 위치 목록 [{ tagId, sector, action }] */
-export function cellsLinkedToHabit(goalTags, habitId) {
-  const out = [];
-  for (const tag of Object.values(goalTags)) {
-    if (!tag.mandala) continue;
-    normalizeMandala(tag.mandala).sectors.forEach((s, si) => s.actions.forEach((a, ai) => {
-      if (a.habitIds.includes(habitId)) out.push({ tagId: tag.id, sector: si, action: ai });
-    }));
-  }
-  return out;
-}
-
-/** 채워진 칸 수: 세부목표/실천항목 */
-export function fillCount(mandala) {
-  const m = normalizeMandala(mandala);
-  const sectors = m.sectors.filter((s) => s.text.trim()).length;
-  const actions = m.sectors.reduce((n, s) => n + s.actions.filter((a) => a.text.trim()).length, 0);
-  return { sectors, actions, total: sectors + actions, max: SLOT_COUNT + SLOT_COUNT * SLOT_COUNT };
+/** 채워진 칸 수 */
+export function fillCount(m, taggedCounts) {
+  const base = normalizeMandalart(m);
+  const tags = base.slots.filter(Boolean).length;
+  const habits = base.slots.reduce((n, tagId) => n + (tagId ? Math.min(SLOT_COUNT, taggedCounts[tagId] || 0) : 0), 0);
+  return { tags, habits, max: SLOT_COUNT + SLOT_COUNT * SLOT_COUNT };
 }
 
 /**
- * 달성률: 실천항목 = 연결 습관들의 pct 평균, 세부목표 = 실천항목 pct 평균(연결된 것만).
- * pctByHabit: { habitId: number|null }
+ * 달성률: 목표 = 그 목표 루틴들의 pct 평균(연결된 것만), 만다라트 = 목표들의 평균.
+ * pctByTag: { tagId: number|null }
  */
-export function mandalaProgress(mandala, pctByHabit) {
-  const m = normalizeMandala(mandala);
+export function mandalartProgress(m, pctByTag) {
+  const base = normalizeMandalart(m);
   const avg = (values) => {
     const nums = values.filter((v) => typeof v === "number");
     return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null;
   };
-  const sectors = m.sectors.map((s) => {
-    const actions = s.actions.map((a) => avg(a.habitIds.map((id) => pctByHabit[id])));
-    return { pct: avg(actions), actions };
-  });
-  return { pct: avg(sectors.map((s) => s.pct)), sectors };
+  const sectors = base.slots.map((tagId) => (tagId ? (pctByTag[tagId] ?? null) : null));
+  return { pct: avg(sectors), sectors };
 }
