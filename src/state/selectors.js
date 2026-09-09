@@ -41,6 +41,16 @@ export function undoneTodos(data, dateKey) {
   return Object.values(data.todos).filter((t) => t.date === dateKey && !t.done);
 }
 
+/** 선택일 이전의 모든 미완료 투두 */
+export function overdueTodos(data, dateKey) {
+  return Object.values(data.todos).filter((t) => t.date < dateKey && !t.done);
+}
+
+/** 투두 탭에도 표시하기로 한, 그날 예정된 습관 */
+export function habitsInTodo(data, dateKey) {
+  return scheduledHabits(data.habits, dateKey).filter((h) => h.showInTodo);
+}
+
 /** 투두 이동 가능 여부: 시간 없는 같은 사분면 항목 중 첫/마지막이면 해당 방향 불가. */
 export function todoMoveBounds(data, todo) {
   if (todo.time) return { up: false, down: false };
@@ -87,6 +97,7 @@ export function habitFormValues(data, id, todayKey) {
     triggerTime: policy?.trigger?.type === "time" ? policy.trigger.value : "",
     triggerText: policy?.trigger?.type === "context" ? policy.trigger.value : "",
     goalTagIds: policy?.goalTagIds ?? [],
+    showInTodo: !!habit?.showInTodo,
   };
 }
 

@@ -1,6 +1,5 @@
-import { makePolicy, withPolicy, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy } from "../domain/schedule.js";
-import { addDays } from "../utils/date.js";
-import { compareKeys } from "../utils/date.js";
+import { makePolicy, applySettingsFrom, alignFirstPolicy, currentPolicy, scheduledHabits, lastActivePolicy, pausePolicies, resumePolicies } from "../domain/schedule.js";
+import { addDays, compareKeys } from "../utils/date.js";
 import { quadrantRank } from "../domain/todo.js";
 import { newId } from "../utils/id.js";
 
@@ -42,6 +41,13 @@ function swapWithNeighbor(map, list, id, dir) {
   const target = list[index];
   const neighbor = list[index + dir];
   if (!target || !neighbor) return map;
+  const orders = list.map((item) => item.order);
+  if (new Set(orders).size !== orders.length) {
+    // 동기화 병합 등으로 order가 겹치면 이 목록 전체를 위치 기준으로 다시 매긴다
+    const swapped = [...list];
+    [swapped[index], swapped[index + dir]] = [swapped[index + dir], swapped[index]];
+    return swapped.reduce((acc, item, i) => ({ ...acc, [item.id]: { ...item, order: i } }), map);
+  }
   return { ...map, [id]: { ...target, order: neighbor.order }, [neighbor.id]: { ...neighbor, order: target.order } };
 }
 
@@ -58,12 +64,13 @@ function toggleCheck(checks, { date, habitId }) {
  * 시작일을 앞당기면 첫 정책도 같이 앞당겨 공백이 생기지 않게 한다.
  */
 function upsertHabit(habits, action) {
-  const { id, name, emoji, startDate, endDate, repeatDays, trigger, today, goalTagIds } = action;
+  const { id, name, emoji, startDate, endDate, repeatDays, trigger, today, goalTagIds, showInTodo } = action;
   const existing = id ? habits[id] : null;
   const habitId = existing ? id : newId("h");
   const effectiveFrom = existing ? (compareKeys(startDate, today) > 0 ? startDate : today) : startDate;
-  const base = existing ? currentPolicy(existing, today) : null;
+  const base = existing ? currentPolicy(existing, effectiveFrom) : null;
   const policy = makePolicy(effectiveFrom, {
+    status: base?.status === "paused" ? "paused" : "active", // 쉬는 중에 수정해도 휴식은 유지
     repeat: { days: [...repeatDays].sort((a, b) => a - b) },
     trigger: trigger?.type ? { type: trigger.type, value: trigger.value } : null,
     goalTagIds: goalTagIds ?? base?.goalTagIds ?? [],
@@ -75,25 +82,21 @@ function upsertHabit(habits, action) {
     reminder: null, levels: null, mandalaRef: null,
     ...(existing || {}),
     id: habitId, name, emoji, startDate, endDate: endDate || null,
-    policies: alignFirstPolicy(withPolicy(existing?.policies || [], policy), startDate),
+    showInTodo: showInTodo ?? existing?.showInTodo ?? false,
+    policies: alignFirstPolicy(existing ? applySettingsFrom(existing.policies, policy) : [policy], startDate),
   };
   return { ...habits, [habitId]: habit };
 }
 
-/** 쉬어가기: from부터 paused, until이 있으면 다음 날부터 다시 active. 설정은 마지막 활성 정책을 복사한다. */
 function pauseHabit(habit, { from, until }) {
-  const base = lastActivePolicy(habit, from) || habit.policies[habit.policies.length - 1];
-  let policies = withPolicy(habit.policies, { ...base, effectiveFrom: from, status: "paused" });
-  if (until) policies = withPolicy(policies, { ...base, effectiveFrom: addDays(until, 1), status: "active" });
-  return { ...habit, policies };
+  return { ...habit, policies: pausePolicies(habit.policies, from, until || null, addDays) };
 }
 
 /** 다시 시작: 종료일을 지우고, 쉬는 중이면 오늘부터 active 정책을 넣는다. */
 function resumeHabit(habit, today) {
   const current = currentPolicy(habit, today);
   if (current && current.status === "active") return { ...habit, endDate: null };
-  const base = lastActivePolicy(habit, today) || current || habit.policies[habit.policies.length - 1];
-  return { ...habit, endDate: null, policies: withPolicy(habit.policies, { ...base, effectiveFrom: today, status: "active" }) };
+  return { ...habit, endDate: null, policies: resumePolicies(habit.policies, today) };
 }
 
 function copyHabit(habits, habit, today) {
@@ -110,6 +113,8 @@ function copyHabit(habits, habit, today) {
 }
 
 function reorderHabits(habits, orderedIds) {
+  const changed = orderedIds.some((id, index) => habits[id] && habits[id].order !== index);
+  if (!changed) return habits;
   const next = { ...habits };
   orderedIds.forEach((id, index) => { if (next[id]) next[id] = { ...next[id], order: index }; });
   return next;
@@ -166,9 +171,10 @@ function priorityFields(priority) {
   return { urgent: !!priority.urgent, important: !!priority.important, classified: true };
 }
 
-/** from 날짜의 미완료 투두를 to 날짜 맨 뒤로 옮긴다. 시간은 유지. */
+/** from 날짜(또는 to 이전 모든 날짜)의 미완료 투두를 to 날짜 맨 뒤로 옮긴다. 시간은 유지. */
 function carryTodos(todos, { from, to }) {
-  const moving = todosOfDate(todos, from).filter((t) => !t.done).sort((a, b) => a.order - b.order);
+  const pick = (t) => !t.done && (from ? t.date === from : t.date < to);
+  const moving = Object.values(todos).filter(pick).sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
   if (!moving.length) return todos;
   let order = maxOrder(todosOfDate(todos, to));
   const next = { ...todos };
@@ -243,6 +249,7 @@ export function initialUi({ today, syncCode, firebaseReady, route = "home" }) {
     statsMonth: today.slice(0, 7),
     statsTab: "month",   // month | week | green
     statsDate: today,    // 주간 통계 기준일
+    recordMonth: today.slice(0, 7), // 월간 기록 시트의 달
     filterTagId: null,
     page: null,          // { type: 'habitForm'|'todoForm', values } 전체 화면
     sheet: null,         // { type, ... } 바텀시트

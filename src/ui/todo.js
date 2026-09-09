@@ -1,11 +1,12 @@
 import { h } from "../utils/dom.js";
-import { todayKey } from "../utils/date.js";
-import { todosForDate, quadrantGroups, undoneTodos } from "../state/selectors.js";
-import { addDays, formatDateDots } from "../utils/date.js";
-import { renderTodoWeek } from "./week.js";
-import { chip } from "./parts.js";
+import { todayKey, formatDateDots } from "../utils/date.js";
+import { todosForDate, quadrantGroups, overdueTodos, habitsInTodo } from "../state/selectors.js";
 import { QUADRANTS, priorityBadges } from "../domain/todo.js";
-import { emptyState } from "./parts.js";
+import { currentPolicy } from "../domain/schedule.js";
+import { isHabitDone } from "../domain/metrics.js";
+import { triggerLabel } from "../domain/format.js";
+import { renderTodoWeek } from "./week.js";
+import { chip, emptyState } from "./parts.js";
 
 function checkCell(todo) {
   return h("div", {
@@ -38,9 +39,10 @@ function withNowMarker(rows, todos, state, now) {
 }
 
 function listView(state, todos, now) {
-  if (!todos.length) return emptyState("📌", "할 일이 없어요", "아래 입력창이나 + 버튼으로 추가해요");
+  const routineRows = habitRows(state);
+  if (!todos.length && !routineRows.length) return emptyState("📌", "할 일이 없어요", "아래 입력창이나 + 버튼으로 추가해요");
   const rows = todos.map((todo, i) => listRow(todo, i, state, now));
-  return h("div", { class: "table" }, withNowMarker(rows, todos, state, now));
+  return h("div", { class: "table" }, routineRows, withNowMarker(rows, todos, state, now));
 }
 
 function matrixItem(todo) {
@@ -70,18 +72,33 @@ function matrixView(state, groups) {
   );
 }
 
-/** 어제 못 끝낸 일이 있으면 오늘 목록 위에 옮기기 배너 */
+/** 오늘 이전에 못 끝낸 일이 있으면 오늘 목록 위에 옮기기 배너 */
 function carryBanner(state) {
   const { selectedDate } = state.ui;
   if (selectedDate !== todayKey()) return null;
-  const yesterday = addDays(selectedDate, -1);
-  const count = undoneTodos(state.data, yesterday).length;
+  const count = overdueTodos(state.data, selectedDate).length;
   if (!count) return null;
-  return h("div", { class: "carry-banner", dataset: { action: "carryOver", from: yesterday, to: selectedDate }, role: "button", tabindex: "0" },
-    h("span", null, `어제 못 끝낸 일 ${count}개`), h("span", { class: "carry-cta" }, "오늘로 옮기기 ›"));
+  return h("div", { class: "carry-banner", dataset: { action: "carryOver", to: selectedDate }, role: "button", tabindex: "0" },
+    h("span", null, `지난 미완료 할 일 ${count}개`), h("span", { class: "carry-cta" }, "오늘로 옮기기 ›"));
 }
 
-function body(state, drafts) {
+/** '투두 탭에도 표시'한 습관을 투두 목록 위에 루틴 행으로 보여준다. 체크는 습관 기록으로 들어간다. */
+function habitRows(state) {
+  const { selectedDate } = state.ui;
+  const { checks, settings } = state.data;
+  return habitsInTodo(state.data, selectedDate).map((habit) => {
+    const done = isHabitDone(habit, checks, selectedDate);
+    const policy = currentPolicy(habit, selectedDate);
+    return h("div", { class: "row todo-row habit-in-todo" },
+      h("div", { class: `cell check${done ? " on check-pop" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": habit.name }, done ? habit.emoji : ""),
+      h("div", { class: "cell when" }, h("span", { class: "t ctx" }, triggerLabel(policy?.trigger, settings.clock24))),
+      h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
+        h("span", { class: "rank" }, "🔁"), h("span", { class: `txt${done ? " done" : ""}` }, `${habit.emoji} ${habit.name}`)),
+    );
+  });
+}
+
+function body(state) {
   const { selectedDate, homeRange } = state.ui;
   if (homeRange === "week") return renderTodoWeek(state);
   const view = state.data.settings.todoView === "matrix" ? "matrix" : "list";
@@ -104,7 +121,7 @@ export function renderTodosTab(state, drafts) {
         h("input", { type: "date", value: selectedDate, dataset: { action: "pickDate" }, "aria-label": "날짜 선택" })),
     ),
     carryBanner(state),
-    body(state, drafts),
+    body(state),
     h("div", { class: "quick-add" },
       h("input", { id: "todoInputField", value: drafts.todo, placeholder: "할 일 빠른 추가 (예: 14:00 병원)", maxlength: "60", dataset: { draft: "todo", enter: "quickAddTodo" }, "aria-label": "할 일 빠른 추가" }),
       h("button", { class: "btn dark", dataset: { action: "quickAddTodo" } }, "추가"),

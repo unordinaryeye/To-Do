@@ -241,3 +241,54 @@ suite("reducers: 쉬어가기 / 복사 / 순서변경", (test) => {
     assertDeepEqual(activeHabits(state.data).map((h) => h.id), ["r6", "r5", "r4", "r3", "r2", "r1"]);
   });
 });
+
+suite("reducers: 리뷰 반영(휴식 유지, 예약 정책 보존, 동률 order)", (test) => {
+  test("쉬는 중에 이름을 바꿔도 휴식과 자동 재개가 유지된다", () => {
+    let state = rootReducer(freshState(), { type: A.HABIT_PAUSE, id: "r1", from: TODAY, until: "2026-09-15" });
+    state = rootReducer(state, newHabit({ id: "r1", name: "물 바꿈", emoji: "💧", startDate: "2000-01-01", repeatDays: [1, 2, 3, 4, 5, 6, 7], trigger: null }));
+    const h = state.data.habits.r1;
+    assertEqual(h.name, "물 바꿈");
+    assertEqual(policyAt(h, "2026-09-12").status, "paused");
+    assertEqual(policyAt(h, "2026-09-16").status, "active");
+    assertEqual(habitsForDate(state.data, "2026-09-16").some((x) => x.id === "r1"), true);
+  });
+  test("예약된 미래 정책은 쉬어가기 뒤에도 설정이 남고, 수정하면 새 설정이 덮인다", () => {
+    let state = rootReducer(freshState(), newHabit({ id: "r1", name: "물", emoji: "💧", startDate: "2000-01-01", repeatDays: [1, 2, 3] }));
+    // 9/20부터 [1,2,3]로 예약된 상태를 흉내: 미래 시작일로 수정
+    state = { ...state, data: { ...state.data, habits: { ...state.data.habits, r1: { ...state.data.habits.r1, policies: [state.data.habits.r1.policies[0], { ...state.data.habits.r1.policies.at(-1), effectiveFrom: "2026-09-20" }] } } } };
+    state = rootReducer(state, { type: A.HABIT_PAUSE, id: "r1", from: TODAY, until: "2026-09-12" });
+    let h = state.data.habits.r1;
+    assertDeepEqual(policyAt(h, "2026-09-21").repeat.days, [1, 2, 3], "예약 정책 보존");
+    assertEqual(policyAt(h, "2026-09-13").status, "active", "재개");
+    state = rootReducer(state, newHabit({ id: "r1", name: "물", emoji: "💧", startDate: "2000-01-01", repeatDays: [6, 7] }));
+    h = state.data.habits.r1;
+    assertDeepEqual(policyAt(h, "2026-09-21").repeat.days, [6, 7], "수정한 설정이 미래 정책에도 적용");
+    assertEqual(policyAt(h, "2026-09-10").status, "paused", "휴식 유지");
+  });
+  test("기한 없는 휴식 후 수정해도 휴식 유지, 다시 시작하면 활성", () => {
+    let state = rootReducer(freshState(), { type: A.HABIT_PAUSE, id: "r1", from: TODAY, until: null });
+    state = rootReducer(state, newHabit({ id: "r1", name: "물2", emoji: "💧", startDate: "2000-01-01", repeatDays: [1] }));
+    assertEqual(policyAt(state.data.habits.r1, "2026-10-01").status, "paused");
+    state = rootReducer(state, { type: A.HABIT_RESUME, id: "r1", today: "2026-09-20" });
+    assertEqual(policyAt(state.data.habits.r1, "2026-10-05").status, "active");
+    assertDeepEqual(policyAt(state.data.habits.r1, "2026-10-05").repeat.days, [1]);
+  });
+  test("order가 겹친 투두도 이동이 된다", () => {
+    let state = freshState();
+    for (const title of ["a", "b", "c"]) state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title, date: TODAY, time: null });
+    const [a, b, c] = todosForDate(state.data, TODAY);
+    state = { ...state, data: { ...state.data, todos: { ...state.data.todos, [b.id]: { ...b, order: a.order } } } }; // 동기화 병합으로 겹친 상황
+    state = rootReducer(state, { type: A.TODO_MOVE, id: c.id, dir: -1 });
+    assertDeepEqual(todosForDate(state.data, TODAY).map((t) => t.title), ["a", "c", "b"]);
+    const orders = todosForDate(state.data, TODAY).map((t) => t.order);
+    assertEqual(new Set(orders).size, 3);
+  });
+  test("순서변경이 변화 없으면 같은 참조, 이월은 모든 과거 미완료", () => {
+    const state = freshState();
+    assertEqual(rootReducer(state, { type: A.HABIT_REORDER, orderedIds: ["r1", "r2", "r3", "r4", "r5", "r6"] }), state);
+    let s2 = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "그제", date: "2026-09-07", time: null });
+    s2 = rootReducer(s2, { type: A.TODO_UPSERT, id: null, title: "어제", date: "2026-09-08", time: null });
+    s2 = rootReducer(s2, { type: A.TODO_CARRY, to: TODAY });
+    assertDeepEqual(todosForDate(s2.data, TODAY).map((t) => t.title), ["그제", "어제"]);
+  });
+});

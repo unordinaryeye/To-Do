@@ -20,7 +20,7 @@ export function renderHabitWeek(state) {
     h("span", { class: "wk-name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" }, `${habit.emoji} ${habit.name}`),
     days.map((d) => {
       const future = compareKeys(d, today) > 0;
-      const scheduled = isScheduled(habit, d);
+      const scheduled = isScheduled(habit, d) && habitsForDate(state.data, d, filterTagId).some((x) => x.id === habit.id);
       const done = scheduled && isHabitDone(habit, checks, d);
       const cls = ["wk-check", done && "on", !scheduled && "off", future && "future"].filter(Boolean).join(" ");
       return h("button", { class: cls, dataset: scheduled && !future ? { action: "toggleCheckOn", id: habit.id, date: d } : {}, disabled: !scheduled || future,

@@ -87,6 +87,12 @@ export function habitStreak(habit, checks, anchorKey) {
   return streak;
 }
 
+function cellState(habit, checks, day, todayKey) {
+  if (!isScheduled(habit, day)) return "off";
+  if (compareKeys(day, todayKey) > 0) return "future";
+  return isHabitDone(habit, checks, day) ? "done" : "missed";
+}
+
 /**
  * 월간 통계. 미래 날짜는 분모에서 뺀다.
  * cells[date] = 'done' | 'missed' | 'off'(예정 아님) | 'future'
@@ -101,18 +107,19 @@ export function monthlyStats(habits, checks, month, todayKey) {
       let scheduled = 0;
       let done = 0;
       for (const day of days) {
-        if (compareKeys(day, todayKey) > 0) cells[day] = "future";
-        else if (!isScheduled(habit, day)) cells[day] = "off";
-        else if (isHabitDone(habit, checks, day)) { cells[day] = "done"; scheduled++; done++; }
-        else { cells[day] = "missed"; scheduled++; }
+        const state = cellState(habit, checks, day, todayKey);
+        cells[day] = state;
+        if (state === "done") { scheduled++; done++; }
+        else if (state === "missed") scheduled++;
       }
       return { habit, cells, scheduled, done, pct: scheduled ? Math.round((done / scheduled) * 100) : null };
     })
     .filter((row) => row.scheduled > 0 || Object.values(row.cells).some((c) => c === "future"));
 
   const totals = perHabit.reduce((acc, row) => ({ scheduled: acc.scheduled + row.scheduled, done: acc.done + row.done }), { scheduled: 0, done: 0 });
-  const pastDays = days.filter((day) => compareKeys(day, todayKey) <= 0);
-  const green = pastDays.map((day) => dayStatus(habits, checks, day).allDone);
+  // 예정 습관이 없는 날은 초록불 판정과 연속 계산에서 건너뛴다(globalStreak과 같은 규칙)
+  const green = days.filter((day) => compareKeys(day, todayKey) <= 0)
+    .map((day) => dayStatus(habits, checks, day)).filter((st) => st.scheduled > 0).map((st) => st.allDone);
   return {
     month,
     days,
@@ -131,12 +138,6 @@ function longestRun(flags) {
     if (run > best) best = run;
   }
   return best;
-}
-
-function cellState(habit, checks, day, todayKey) {
-  if (compareKeys(day, todayKey) > 0) return "future";
-  if (!isScheduled(habit, day)) return "off";
-  return isHabitDone(habit, checks, day) ? "done" : "missed";
 }
 
 /** 주간 통계: 습관 × 7일 셀 + 요일별 달성률 */
@@ -172,7 +173,7 @@ export function greenLightStats(habits, checks, month, todayKey) {
     if (status.allDone) return { day, state: "green" };
     return { day, state: status.done > 0 ? "partial" : "zero", pct: status.pct };
   });
-  const green = days.filter((d) => d.state !== "future").map((d) => d.state === "green");
+  const green = days.filter((d) => d.state !== "future" && d.state !== "none").map((d) => d.state === "green");
   return { month, days, greenDays: green.filter(Boolean).length, longestStreak: longestRun(green) };
 }
 

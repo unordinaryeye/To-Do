@@ -22,14 +22,23 @@ export function createActions({ store, sync, drafts }) {
   const navigation = {
     goRoute: (el) => ui({ route: el.dataset.route, sheet: null, page: null }),
     syncRoute: (route) => { if (getState().ui.route !== route) ui({ route, sheet: null, page: null }); },
-    closeLayers: () => { if (getState().ui.sheet || getState().ui.page) closeAll(); },
+    closeLayers: () => {
+      const { sheet, page } = getState().ui;
+      if (sheet) ui({ sheet: null });
+      else if (page?.returnTo) ui({ page: page.returnTo }); // 목표 폼에서 뒤로 → 작성 중이던 습관 폼으로
+      else if (page) ui({ page: null });
+    },
+    backFromTagForm: () => { const { page } = getState().ui; ui({ sheet: null, page: page?.returnTo || null }); },
     openSettingsRoute: () => ui({ route: "settings" }),
     setHomeTab: (el) => ui({ homeTab: el.dataset.tab }),
     moveDate: (el) => ui({ selectedDate: addDays(selected(), Number(el.dataset.n)) }),
     goToday: () => ui({ selectedDate: todayKey() }),
     selectDate: (el) => ui({ selectedDate: el.dataset.date }),
     moveStatsMonth: (el) => ui({ statsMonth: addMonths(getState().ui.statsMonth, Number(el.dataset.n)) }),
-    moveStatsWeek: (el) => ui({ statsDate: addDays(getState().ui.statsDate, Number(el.dataset.n)) }),
+    moveStatsWeek: (el) => {
+      const next = addDays(getState().ui.statsDate, Number(el.dataset.n));
+      if (next <= todayKey() || Number(el.dataset.n) < 0) ui({ statsDate: next }); // 미래 주로는 넘어가지 않음
+    },
     setStatsTab: (el) => ui({ statsTab: el.dataset.tab }),
     goHomeDate: (el) => ui({ route: "home", homeTab: "habits", selectedDate: el.dataset.date }),
     toggleFilterTag: (el) => ui({ filterTagId: getState().ui.filterTagId === el.dataset.id ? null : el.dataset.id }),
@@ -82,7 +91,7 @@ export function createActions({ store, sync, drafts }) {
       type: A.HABIT_UPSERT, id: values.id, name, emoji,
       startDate: drafts.startDate, endDate: drafts.endDate || null,
       repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
-      goalTagIds: values.goalTagIds,
+      goalTagIds: values.goalTagIds, showInTodo: values.showInTodo,
     };
   }
 
@@ -95,7 +104,7 @@ export function createActions({ store, sync, drafts }) {
     formColor: (el) => patchForm({ color: el.dataset.color }),
     openTagActions: (el) => ui({ sheet: { type: "tagActions", id: el.dataset.id } }),
     openTagForm: (el) => {
-      const used = Object.values(getState().data.goalTags).length;
+      const used = Object.values(getState().data.goalTags).filter((t) => !t.archived).length;
       const values = tagFormValues(getState().data, el?.dataset.id || null, TAG_COLORS[used % TAG_COLORS.length]);
       initTagDrafts(drafts, values);
       // 습관 폼에서 열었으면 돌아갈 수 있게 이전 페이지를 기억한다
@@ -134,7 +143,7 @@ export function createActions({ store, sync, drafts }) {
     selectDateDay: (el) => ui({ selectedDate: el.dataset.date, homeRange: "day" }),
     pickDate: (el) => { if (isValidDateKey(el.value)) ui({ selectedDate: el.value, homeRange: "day" }); },
     carryOver: (el) => {
-      dispatch({ type: A.TODO_CARRY, from: el.dataset.from, to: el.dataset.to });
+      dispatch({ type: A.TODO_CARRY, to: el.dataset.to }); // to 이전의 모든 미완료
       toast("📦", "오늘로 옮겼어요");
     },
     openHabitActions: (el) => ui({ sheet: { type: "habitActions", id: el.dataset.id } }),
@@ -180,7 +189,8 @@ export function createActions({ store, sync, drafts }) {
       toast("🛌", el.dataset.until ? "쉬어가요. 끝나면 자동으로 다시 예정돼요" : "쉬어가요. 내정보에서 다시 시작할 수 있어요");
     },
     copyHabit: (el) => { dispatch({ type: A.HABIT_COPY, id: el.dataset.id, today: todayKey() }); ui({ sheet: null }); toast("📋", "복사했어요. 오늘부터 시작돼요"); },
-    openHabitRecord: (el) => ui({ sheet: { type: "record", id: el.dataset.id }, statsMonth: todayKey().slice(0, 7) }),
+    openHabitRecord: (el) => ui({ sheet: { type: "record", id: el.dataset.id }, recordMonth: todayKey().slice(0, 7) }),
+    moveRecordMonth: (el) => ui({ recordMonth: addMonths(getState().ui.recordMonth, Number(el.dataset.n)) }),
     openReorder: () => ui({ sheet: null, page: { type: "reorder" } }),
     reorderHabits: (orderedIds) => dispatch({ type: A.HABIT_REORDER, orderedIds }),
     askDeleteHabit: (el) => ui({ sheet: { type: "confirmDeleteHabit", id: el.dataset.id } }),
@@ -220,8 +230,11 @@ export function createActions({ store, sync, drafts }) {
     formPriority: (el) => {
       const v = formValues();
       const flag = el.dataset.flag;
-      patchForm({ classified: true, urgent: !!v.urgent, important: !!v.important, [flag]: v.classified ? !v[flag] : true });
+      const next = { urgent: !!v.urgent, important: !!v.important, [flag]: v.classified ? !v[flag] : true };
+      // 두 플래그를 모두 끄면 Q4가 아니라 미분류로 돌아간다
+      patchForm(next.urgent || next.important ? { ...next, classified: true } : { urgent: false, important: false, classified: false });
     },
+    formToggleShowInTodo: () => patchForm({ showInTodo: !formValues().showInTodo }),
     formPriorityClear: () => patchForm({ classified: false, urgent: false, important: false }),
     openQuadrantPicker: (el) => ui({ sheet: { type: "quadrant", id: el.dataset.id } }),
     setQuadrant: (el) => {

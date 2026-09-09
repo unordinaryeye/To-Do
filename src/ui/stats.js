@@ -69,7 +69,7 @@ function renderMonthView(state) {
 const VIEWS = { month: renderMonthView, week: renderWeekView, green: renderGreenView };
 
 export function renderStats(state) {
-  const tab = state.ui.statsTab || "month";
+  const tab = VIEWS[state.ui.statsTab] ? state.ui.statsTab : "month";
   return h("div", { class: "screen fade-in" },
     h("div", { class: "page-title" }, "통계"),
     h("div", { class: "seg2 stats-tabs", role: "tablist" }, TABS.map(([id, label]) =>

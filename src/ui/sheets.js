@@ -148,15 +148,15 @@ function recordSheet(state, id) {
   if (!habit) return null;
   const today = todayKey();
   const { checks, settings } = state.data;
-  const month = state.ui.statsMonth;
+  const month = state.ui.recordMonth;
   const stats = monthlyStats({ [id]: habit }, checks, month, today);
   const row = stats.perHabit[0];
   const streak = habitStreak(habit, checks, today);
   return sheet([
     h("div", { class: "card-row" },
-      h("button", { class: "arrow", dataset: { action: "moveStatsMonth", n: "-1" }, "aria-label": "지난달" }, "‹"),
+      h("button", { class: "arrow", dataset: { action: "moveRecordMonth", n: "-1" }, "aria-label": "지난달" }, "‹"),
       h("span", { class: "card-title" }, `${month.slice(0, 4)}년 ${Number(month.slice(5))}월`),
-      h("button", { class: `arrow${month === today.slice(0, 7) ? " dim" : ""}`, dataset: { action: "moveStatsMonth", n: "1" }, disabled: month === today.slice(0, 7), "aria-label": "다음달" }, "›"),
+      h("button", { class: `arrow${month === today.slice(0, 7) ? " dim" : ""}`, dataset: { action: "moveRecordMonth", n: "1" }, disabled: month === today.slice(0, 7), "aria-label": "다음달" }, "›"),
     ),
     row ? h("div", { class: "habit-card single" },
       h("div", { class: "day-grid" }, stats.days.map((day) => h("div", { class: `day-cell ${row.cells[day]}` }, String(Number(day.slice(8)))))),

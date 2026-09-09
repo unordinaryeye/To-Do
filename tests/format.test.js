@@ -56,7 +56,8 @@ suite("metrics: monthlyStats", (test) => {
     assertEqual(m.cells["2026-09-07"], "done");
     assertEqual(m.cells["2026-09-08"], "off");
     assertEqual(m.cells["2026-09-09"], "missed");
-    assertEqual(m.cells["2026-09-10"], "future");
+    assertEqual(m.cells["2026-09-10"], "off");    // 목: 예정 아님(미래여도 off가 우선)
+    assertEqual(m.cells["2026-09-11"], "future"); // 금: 예정된 미래
     assertEqual(m.scheduled, 4); // 9/2(수) 9/4(금) 9/7(월) 9/9(수)
     assertEqual(m.done, 1);
     assertEqual(stats.greenDays, 2); // 9/7(a,m 완료), 9/8(a만 예정이고 완료)
@@ -86,7 +87,7 @@ suite("metrics: weeklyStats / greenLightStats", (test) => {
     const checks = { "2026-09-07": { a: 1, m: 1 }, "2026-09-08": { a: 1 } };
     const s = weeklyStats(habits, checks, week, "2026-09-09");
     const m = s.perHabit.find((r) => r.habit.id === "m");
-    assertDeepEqual([m.cells["2026-09-07"], m.cells["2026-09-08"], m.cells["2026-09-09"], m.cells["2026-09-10"]], ["done", "off", "missed", "future"]);
+    assertDeepEqual([m.cells["2026-09-07"], m.cells["2026-09-08"], m.cells["2026-09-09"], m.cells["2026-09-10"], m.cells["2026-09-11"]], ["done", "off", "missed", "off", "future"]);
     assertEqual(s.perDay[0].pct, 100);
     assertEqual(s.perDay[1].pct, 100); // 화: a만 예정
     assertEqual(s.perDay[2].pct, 0);
@@ -108,5 +109,21 @@ suite("metrics: weeklyStats / greenLightStats", (test) => {
     const g = greenLightStats(habits, {}, "2026-09", "2026-09-09");
     assertEqual(g.days[0].state, "none"); // 9/1 화
     assertEqual(g.days[6].state, "zero"); // 9/7 월
+  });
+});
+
+suite("metrics: 리뷰 반영(초록불 규칙, 끝낸 루틴)", (test) => {
+  const habit = (id, days, over = {}) => ({ id, name: id, emoji: "✅", order: 0, startDate: "2026-09-01", endDate: null, deletedAt: null, policies: [makePolicy("2026-09-01", { repeat: { days } })], ...over });
+  test("초록불 최장 연속은 예정 없는 날을 건너뛴다(현재 연속과 같은 규칙)", () => {
+    const habits = { m: habit("m", [1, 3, 5]) };
+    const checks = { "2026-09-02": { m: 1 }, "2026-09-04": { m: 1 }, "2026-09-07": { m: 1 } }; // 수 금 월 연속
+    const g = greenLightStats(habits, checks, "2026-09", "2026-09-08");
+    assertEqual(g.longestStreak, 3);
+    assertEqual(monthlyStats(habits, checks, "2026-09", "2026-09-08").longestStreak, 3);
+  });
+  test("끝낸 루틴은 미래 주에 나타나지 않는다", () => {
+    const habits = { e: habit("e", [1, 2, 3, 4, 5, 6, 7], { endDate: "2026-02-01" }) };
+    const s = weeklyStats(habits, {}, ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"], "2026-09-09");
+    assertEqual(s.perHabit.length, 0);
   });
 });

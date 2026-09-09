@@ -109,6 +109,10 @@ export function renderHabitForm(state, drafts) {
 function tagSection(state, values) {
   const tags = activeTags(state.data);
   return h("div", { class: "form-group" },
+    h("div", { class: "form-row" },
+      h("span", { class: "k" }, "투두 탭에도 표시"),
+      h("button", { class: `switch${values.showInTodo ? " on" : ""}`, dataset: { action: "formToggleShowInTodo" }, role: "switch", "aria-checked": String(!!values.showInTodo) }, h("span", { class: "knob" })),
+    ),
     h("div", { class: "form-section" },
       h("div", { class: "k" }, "🏷 목표 태그", h("span", { class: "hint" }, values.goalTagIds.length ? `${values.goalTagIds.length}개 선택` : "선택 안 함")),
       h("div", { class: "chips" },
@@ -126,7 +130,7 @@ export function initTagDrafts(drafts, values) {
 export function renderTagForm(state, drafts) {
   const values = state.ui.page.values;
   const editing = !!values.id;
-  return page(editing ? "목표 수정" : "목표 추가", { confirmLabel: "확인", confirmDataset: { action: "submitTagForm" } },
+  return page(editing ? "목표 수정" : "목표 추가", { confirmLabel: "확인", confirmDataset: { action: "submitTagForm" }, backDataset: { action: "backFromTagForm" } },
     h("div", { class: "form-name" },
       h("button", { class: "emoji-btn", dataset: { action: "openEmojiSheet" }, "aria-label": "이모지 선택" }, values.emoji),
       h("input", { id: "tagNameField", value: drafts.tagName, placeholder: "목표 이름 (예: 건강 챙기기)", maxlength: "20", dataset: { draft: "tagName" }, "aria-label": "목표 이름" }),

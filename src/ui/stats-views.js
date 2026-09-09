@@ -4,6 +4,7 @@ import { weeklyStats, greenLightStats, globalStreak } from "../domain/metrics.js
 
 const CELL_SYMBOL = { done: "■", missed: "□", off: "–", future: "·" };
 const GREEN_SYMBOL = { green: "●", partial: "◑", zero: "○", none: "─", future: "" };
+const GREEN_LABEL = { green: "초록불", partial: "일부 달성", zero: "미달성", none: "예정 없음", future: "미래" };
 
 function weekLabel(days) {
   const first = fromDateKey(days[0]);
@@ -77,7 +78,7 @@ function greenCalendar(stats, weekStart) {
       Array.from({ length: lead }, () => h("div", { class: "gl-cell blank" })),
       stats.days.map(({ day, state }) => h("button", {
         class: `gl-cell ${state}`, dataset: { action: "goHomeDate", date: day }, disabled: state === "future",
-        "aria-label": `${fromDateKey(day).getDate()}일 ${state}`,
+        "aria-label": `${fromDateKey(day).getDate()}일 ${GREEN_LABEL[state]}`,
       }, h("span", { class: "gl-num" }, String(fromDateKey(day).getDate())), h("span", { class: "gl-sym" }, GREEN_SYMBOL[state]))),
     ),
     h("div", { class: "legend" }, "● 초록불  ◑ 일부  ○ 0%  ─ 예정 없음 · 날짜를 탭하면 그날로 이동"),

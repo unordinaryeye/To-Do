@@ -43,6 +43,10 @@ export function scheduledHabits(habits, dateKey) {
     .sort((a, b) => a.order - b.order);
 }
 
+const byDate = (a, b) => compareKeys(a.effectiveFrom, b.effectiveFrom);
+const SETTING_KEYS = ["repeat", "trigger", "goalTagIds", "targetCount"];
+const settingsOf = (policy) => Object.fromEntries(SETTING_KEYS.map((k) => [k, policy[k]]));
+
 /**
  * 정책 배열에 새 정책을 넣는다. 같은 날짜는 교체하고, 그 이후 날짜의 정책은 버린다
  * (새 설정이 "그날부터 계속"이라는 뜻이므로 예전에 예약해 둔 미래 정책이 되살아나면 안 된다).
@@ -51,6 +55,43 @@ export function scheduledHabits(habits, dateKey) {
 export function withPolicy(policies, policy) {
   const kept = policies.filter((p) => compareKeys(p.effectiveFrom, policy.effectiveFrom) < 0);
   return [...kept, policy];
+}
+
+/**
+ * 설정 변경: policy의 설정(반복·시간·태그·목표수)을 그날부터 적용하되, 이후 정책의 "상태"(쉬는 중/활성/재개 예약)는 유지한다.
+ * 같은 날짜 정책은 교체하고, 이후 정책은 설정만 새 값으로 덮어쓴다.
+ */
+export function applySettingsFrom(policies, policy) {
+  const settings = settingsOf(policy);
+  const earlier = policies.filter((p) => compareKeys(p.effectiveFrom, policy.effectiveFrom) < 0);
+  const later = policies.filter((p) => compareKeys(p.effectiveFrom, policy.effectiveFrom) > 0).map((p) => ({ ...p, ...settings }));
+  return [...earlier, policy, ...later].sort(byDate);
+}
+
+/**
+ * 쉬어가기: from부터 paused. until이 있으면 그 사이 정책은 paused로 바꾸고 다음 날 active로 재개한다.
+ * until이 없으면 이후 정책을 모두 paused로 바꾼다(다시 시작할 때까지). 예약된 미래 정책의 설정은 보존된다.
+ */
+export function pausePolicies(policies, from, until, addDays) {
+  const base = policies.filter((p) => compareKeys(p.effectiveFrom, from) <= 0).sort(byDate).at(-1) || policies.at(-1);
+  const inPause = (p) => compareKeys(p.effectiveFrom, from) > 0 && (!until || compareKeys(p.effectiveFrom, until) <= 0);
+  let next = policies.filter((p) => p.effectiveFrom !== from).map((p) => (inPause(p) ? { ...p, status: "paused" } : p));
+  next.push({ ...base, effectiveFrom: from, status: "paused" });
+  if (until) {
+    const resumeDay = addDays(until, 1);
+    if (!next.some((p) => p.effectiveFrom === resumeDay)) {
+      const source = next.filter((p) => compareKeys(p.effectiveFrom, until) <= 0).sort(byDate).at(-1);
+      next.push({ ...source, effectiveFrom: resumeDay, status: "active" });
+    }
+  }
+  return next.sort(byDate);
+}
+
+/** 다시 시작: today부터 active, 이후 paused로 바뀌어 있던 정책도 active로. */
+export function resumePolicies(policies, today) {
+  const base = policies.filter((p) => compareKeys(p.effectiveFrom, today) <= 0).sort(byDate).at(-1) || policies.at(-1);
+  const rest = policies.filter((p) => p.effectiveFrom !== today).map((p) => (compareKeys(p.effectiveFrom, today) > 0 ? { ...p, status: "active" } : p));
+  return [...rest, { ...base, effectiveFrom: today, status: "active" }].sort(byDate);
 }
 
 /** 시작일이 첫 정책보다 이르면 첫 정책을 시작일까지 내려 공백 구간을 없앤다. */

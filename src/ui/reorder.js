@@ -11,15 +11,13 @@ import { page, moveButtons } from "./parts.js";
  */
 function attachDrag(list, onCommit) {
   let dragging = null;
-  let offsetY = 0;
 
   list.addEventListener("pointerdown", (event) => {
     const handle = event.target.closest(".handle");
     if (!handle) return;
     dragging = handle.closest(".reorder-row");
-    offsetY = event.clientY - dragging.getBoundingClientRect().top;
     dragging.classList.add("dragging");
-    dragging.setPointerCapture?.(event.pointerId);
+    list.setPointerCapture?.(event.pointerId); // 행이 아니라 리스트에 캡처: 행은 드래그 중 DOM에서 옮겨진다
     event.preventDefault();
   });
 
@@ -48,6 +46,7 @@ function attachDrag(list, onCommit) {
   };
   list.addEventListener("pointerup", finish);
   list.addEventListener("pointercancel", finish);
+  window.addEventListener("pointerup", finish); // 리스트 밖에서 손을 떼도 마무리
   return list;
 }
 
