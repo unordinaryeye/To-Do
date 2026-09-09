@@ -4,7 +4,13 @@ import { ALL_WEEKDAYS } from "../config.js";
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKEND = [6, 7];
 
-const sameSet = (a, b) => a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
+const sortedNums = (arr) => [...arr].sort((x, y) => x - y);
+const sameSet = (a, b) => {
+  if (a.length !== b.length) return false;
+  const sa = sortedNums(a);
+  const sb = sortedNums(b);
+  return sa.every((v, i) => v === sb[i]);
+};
 
 /** 반복 요일 → "매일" / "평일" / "주말" / "월·수·금" (short) 또는 "월요일, 수요일, 금요일" (long) */
 export function repeatLabel(days, { long = false } = {}) {

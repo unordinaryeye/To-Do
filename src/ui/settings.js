@@ -1,6 +1,6 @@
 import { h } from "../utils/dom.js";
-import { formatBackupTime, ISO_DAYS_KR } from "../utils/date.js";
-import { activeHabits, recordedDayCount } from "../state/selectors.js";
+import { formatBackupTime, ISO_DAYS_KR, todayKey } from "../utils/date.js";
+import { activeHabits, recordedDayCount, endedHabits } from "../state/selectors.js";
 import { getLastBackup } from "../storage/local.js";
 import { SCHEMA_VERSION } from "../config.js";
 import { listItem } from "./parts.js";
@@ -45,6 +45,7 @@ function weekStartRow(settings) {
 export function renderSettings(state, drafts) {
   const habitCount = activeHabits(state.data).length;
   const days = recordedDayCount(state.data);
+  const ended = endedHabits(state.data, todayKey()).length;
   return h("div", { class: "screen fade-in" },
     h("div", { class: "page-title" }, "내정보"),
     syncSection(state.ui, drafts.sync),
@@ -52,6 +53,7 @@ export function renderSettings(state, drafts) {
     listItem({ icon: "💾", iconBg: "#DBEAFE", main: "데이터 백업", sub: `파일로 백업 · 마지막: ${formatBackupTime(getLastBackup())}`, dataset: { action: "backup" } }),
     listItem({ icon: "📂", iconBg: "#FEF3C7", main: "데이터 복원", sub: "백업 파일에서 복원", dataset: { action: "restore" } }),
     weekStartRow(state.data.settings),
+    listItem({ icon: "⛔", iconBg: "#F5F5F4", main: "끝낸 루틴", sub: ended ? `${ended}개 · 탭해서 다시 시작` : "없음", dataset: { action: "openEnded" } }),
     listItem({ icon: "📊", iconBg: "#F3E8FF", main: "내 기록", sub: `루틴 ${habitCount}개 · 기록된 날 ${days}일`, isStatic: true }),
     h("div", { style: { height: "8px" } }),
     listItem({ icon: "🗑️", iconBg: "#FEE2E2", main: "전체 초기화", sub: "모든 데이터 삭제", dataset: { action: "askReset" }, danger: true }),

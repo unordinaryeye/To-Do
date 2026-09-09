@@ -2,7 +2,7 @@ import { suite, assertEqual, assertDeepEqual, assertTrue } from "./harness.js";
 import { rootReducer, A, initialUi } from "../src/state/reducers.js";
 import { createStore } from "../src/state/store.js";
 import { defaultData } from "../src/domain/migrate.js";
-import { todosForDate, activeHabits, habitsForDate } from "../src/state/selectors.js";
+import { todosForDate, activeHabits, habitsForDate, endedHabits, todoMoveBounds } from "../src/state/selectors.js";
 import { policyAt } from "../src/domain/schedule.js";
 
 const TODAY = "2026-09-09";
@@ -93,6 +93,30 @@ suite("reducers: 습관 upsert", (test) => {
     assertDeepEqual(activeHabits(state.data).slice(0, 4).map((h) => h.id), ["r1", "r2", "r4", "r3"]);
     assertEqual(rootReducer(state, { type: A.HABIT_MOVE, id: "r1", dir: -1 }), state);
   });
+
+  test("date를 주면 그날 화면 목록 기준으로 이웃을 찾는다(예정 아닌 습관은 건너뜀)", () => {
+    let state = rootReducer(freshState(), newHabit({ id: "r2", name: "s", emoji: "🤸", startDate: "2000-01-01", repeatDays: [1, 3, 5] }));
+    // 목요일 9/10: r2 미예정. r3 위로 이동하면 r1과 바뀌어야 한다.
+    state = rootReducer(state, { type: A.HABIT_MOVE, id: "r3", dir: -1, date: "2026-09-10" });
+    assertDeepEqual(habitsForDate(state.data, "2026-09-10").slice(0, 2).map((h) => h.id), ["r3", "r1"]);
+  });
+
+  test("시작일을 앞당기면 그 구간도 예정된다", () => {
+    let state = rootReducer(freshState(), newHabit({ name: "늦게 만든" }));
+    const id = Object.values(state.data.habits).find((h) => h.name === "늦게 만든").id;
+    state = rootReducer(state, newHabit({ id, name: "늦게 만든", startDate: "2026-09-01" }));
+    const habit = state.data.habits[id];
+    assertEqual(habit.policies[0].effectiveFrom, "2026-09-01");
+    assertTrue(policyAt(habit, "2026-09-03") !== null);
+  });
+
+  test("끝내기 / 다시 시작", () => {
+    let state = rootReducer(freshState(), { type: A.HABIT_END, id: "r1", date: "2026-09-08" });
+    assertEqual(habitsForDate(state.data, TODAY).some((h) => h.id === "r1"), false);
+    assertTrue(endedHabits(state.data, TODAY).some((h) => h.id === "r1"));
+    state = rootReducer(state, { type: A.HABIT_RESUME, id: "r1" });
+    assertTrue(habitsForDate(state.data, TODAY).some((h) => h.id === "r1"));
+  });
 });
 
 suite("reducers: 체크 / 투두 / 설정", (test) => {
@@ -127,6 +151,20 @@ suite("reducers: 체크 / 투두 / 설정", (test) => {
     assertDeepEqual(moved.map((t) => t.title), ["a2", "b"]); // 시간 있는 항목 우선
     assertEqual(moved[0].order, 1);
     assertEqual(todosForDate(state.data, TODAY).length, 0);
+  });
+
+  test("투두 이동은 시간 없는 항목끼리만, 시간 있는 항목은 이동 불가", () => {
+    let state = freshState();
+    state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "A", date: TODAY, time: "09:00" });
+    state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "B", date: TODAY, time: null });
+    state = rootReducer(state, { type: A.TODO_UPSERT, id: null, title: "C", date: TODAY, time: null });
+    const [a, b, c] = todosForDate(state.data, TODAY);
+    assertEqual(rootReducer(state, { type: A.TODO_MOVE, id: b.id, dir: -1 }), state, "B는 무시간 첫 항목이라 위로 불가");
+    assertEqual(rootReducer(state, { type: A.TODO_MOVE, id: a.id, dir: 1 }), state, "시간 있는 A는 이동 불가");
+    state = rootReducer(state, { type: A.TODO_MOVE, id: c.id, dir: -1 });
+    assertDeepEqual(todosForDate(state.data, TODAY).map((t) => t.title), ["A", "C", "B"]);
+    assertDeepEqual(todoMoveBounds(state.data, state.data.todos[a.id]), { up: false, down: false });
+    assertDeepEqual(todoMoveBounds(state.data, state.data.todos[c.id]), { up: false, down: true });
   });
 
   test("중간 삭제 후 추가해도 order가 겹치지 않아 이동이 된다", () => {

@@ -41,8 +41,3 @@ export const DEFAULT_ROUTINES = [
 
 export const EMOJI_OPTIONS = ["✅", "💧", "🤸", "📝", "🏃", "📖", "📋", "🧘", "💪", "🎯", "🧠", "💊", "🥗", "☕", "🛌", "🎵", "🖊️", "💻", "🌿", "🙏"];
 
-export const TODO_COLOR = "#6366F1";
-export const COLOR_DONE = "#10B981";
-export const COLOR_PARTIAL = "#F59E0B";
-export const COLOR_NONE = "#E7E5E4";
-export const COLOR_LOW = "#EF4444";

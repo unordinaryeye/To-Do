@@ -33,10 +33,20 @@ export function scheduledHabits(habits, dateKey) {
     .sort((a, b) => a.order - b.order);
 }
 
-/** 정책 배열에 새 정책을 넣는다. 같은 effectiveFrom이면 교체. 항상 새 배열을 돌려준다. */
+/**
+ * 정책 배열에 새 정책을 넣는다. 같은 날짜는 교체하고, 그 이후 날짜의 정책은 버린다
+ * (새 설정이 "그날부터 계속"이라는 뜻이므로 예전에 예약해 둔 미래 정책이 되살아나면 안 된다).
+ * 항상 새 배열을 돌려준다.
+ */
 export function withPolicy(policies, policy) {
-  const rest = policies.filter((p) => p.effectiveFrom !== policy.effectiveFrom);
-  return [...rest, policy].sort((a, b) => compareKeys(a.effectiveFrom, b.effectiveFrom));
+  const kept = policies.filter((p) => compareKeys(p.effectiveFrom, policy.effectiveFrom) < 0);
+  return [...kept, policy];
+}
+
+/** 시작일이 첫 정책보다 이르면 첫 정책을 시작일까지 내려 공백 구간을 없앤다. */
+export function alignFirstPolicy(policies, startDate) {
+  if (!policies.length || compareKeys(policies[0].effectiveFrom, startDate) <= 0) return policies;
+  return [{ ...policies[0], effectiveFrom: startDate }, ...policies.slice(1)];
 }
 
 export function makePolicy(effectiveFrom, overrides = {}) {

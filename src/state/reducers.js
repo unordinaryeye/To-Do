@@ -1,4 +1,4 @@
-import { makePolicy, withPolicy, currentPolicy } from "../domain/schedule.js";
+import { makePolicy, withPolicy, alignFirstPolicy, currentPolicy, scheduledHabits } from "../domain/schedule.js";
 import { compareKeys } from "../utils/date.js";
 import { newId } from "../utils/id.js";
 
@@ -6,7 +6,8 @@ import { newId } from "../utils/id.js";
 export const A = {
   CHECK_TOGGLE: "check/toggle",
   HABIT_UPSERT: "habit/upsert",
-  HABIT_RENAME: "habit/rename",
+  HABIT_END: "habit/end",
+  HABIT_RESUME: "habit/resume",
   HABIT_DELETE: "habit/delete",
   HABIT_MOVE: "habit/move",
   TODO_UPSERT: "todo/upsert",
@@ -26,6 +27,15 @@ const without = (obj, key) => {
 
 const maxOrder = (items) => items.reduce((max, item) => Math.max(max, item.order), -1);
 
+/** 정렬된 목록에서 id의 이웃과 order를 맞바꾼다. 이웃이 없으면 그대로. */
+function swapWithNeighbor(map, list, id, dir) {
+  const index = list.findIndex((item) => item.id === id);
+  const target = list[index];
+  const neighbor = list[index + dir];
+  if (!target || !neighbor) return map;
+  return { ...map, [id]: { ...target, order: neighbor.order }, [neighbor.id]: { ...neighbor, order: target.order } };
+}
+
 function toggleCheck(checks, { date, habitId }) {
   const day = checks[date] || {};
   const nextDay = day[habitId] ? without(day, habitId) : { ...day, [habitId]: 1 };
@@ -36,6 +46,7 @@ function toggleCheck(checks, { date, habitId }) {
 /**
  * 습관 생성/수정. 반복·시간은 정책으로 저장된다.
  * 새 습관: startDate부터 적용되는 정책 1개. 기존 습관: 오늘(또는 미래 startDate)부터 새 정책.
+ * 시작일을 앞당기면 첫 정책도 같이 앞당겨 공백이 생기지 않게 한다.
  */
 function upsertHabit(habits, action) {
   const { id, name, emoji, startDate, endDate, repeatDays, trigger, today } = action;
@@ -55,43 +66,33 @@ function upsertHabit(habits, action) {
     reminder: null, levels: null, mandalaRef: null,
     ...(existing || {}),
     id: habitId, name, emoji, startDate, endDate: endDate || null,
-    policies: withPolicy(existing?.policies || [], policy),
+    policies: alignFirstPolicy(withPolicy(existing?.policies || [], policy), startDate),
   };
   return { ...habits, [habitId]: habit };
 }
 
-/** 전체 목록(표시 순서) 안에서 이웃과 order를 바꾼다. */
-function moveHabit(habits, { id, dir }) {
-  const target = habits[id];
-  if (!target) return habits;
-  const list = Object.values(habits).filter((h) => !h.deletedAt).sort((a, b) => a.order - b.order);
-  const index = list.findIndex((h) => h.id === id);
-  const neighbor = list[index + dir];
-  if (!neighbor) return habits;
-  return {
-    ...habits,
-    [id]: { ...target, order: neighbor.order },
-    [neighbor.id]: { ...neighbor, order: target.order },
-  };
-}
-
 function habitsReducer(habits, action) {
+  const habit = habits[action.id];
   switch (action.type) {
     case A.HABIT_UPSERT: return upsertHabit(habits, action);
-    case A.HABIT_RENAME: {
-      const habit = habits[action.id];
-      if (!habit || habit.name === action.name) return habits;
-      return { ...habits, [action.id]: { ...habit, name: action.name } };
+    case A.HABIT_END: return habit ? { ...habits, [action.id]: { ...habit, endDate: action.date } } : habits;
+    case A.HABIT_RESUME: return habit ? { ...habits, [action.id]: { ...habit, endDate: null } } : habits;
+    case A.HABIT_DELETE: return habit ? without(habits, action.id) : habits;
+    case A.HABIT_MOVE: {
+      // 화면에 보이는 목록(선택일 예정 습관) 안에서 이웃과 바꾼다. date가 없으면 전체 목록.
+      const list = action.date
+        ? scheduledHabits(habits, action.date)
+        : Object.values(habits).filter((h) => !h.deletedAt).sort((a, b) => a.order - b.order);
+      return swapWithNeighbor(habits, list, action.id, action.dir);
     }
-    case A.HABIT_DELETE: return habits[action.id] ? without(habits, action.id) : habits;
-    case A.HABIT_MOVE: return moveHabit(habits, action);
     default: return habits;
   }
 }
 
-function todosOfDate(todos, date) {
-  return Object.values(todos).filter((t) => t.date === date).sort((a, b) => a.order - b.order);
-}
+const todosOfDate = (todos, date) => Object.values(todos).filter((t) => t.date === date);
+
+/** 시간 없는 항목만 수동 순서를 가진다. 시간 있는 항목은 시간순이라 이동 대상이 아니다. */
+export const untimedTodos = (todos, date) => todosOfDate(todos, date).filter((t) => !t.time).sort((a, b) => a.order - b.order);
 
 function upsertTodo(todos, { id, title, date, time }) {
   const existing = id ? todos[id] : null;
@@ -109,27 +110,18 @@ function upsertTodo(todos, { id, title, date, time }) {
 }
 
 function todosReducer(todos, action) {
+  const todo = todos[action.id];
   switch (action.type) {
     case A.TODO_UPSERT: return upsertTodo(todos, action);
     case A.TODO_TOGGLE: {
-      const todo = todos[action.id];
       if (!todo) return todos;
       const done = !todo.done;
       return { ...todos, [action.id]: { ...todo, done, completedAt: done ? new Date().toISOString() : null } };
     }
-    case A.TODO_DELETE: return todos[action.id] ? without(todos, action.id) : todos;
+    case A.TODO_DELETE: return todo ? without(todos, action.id) : todos;
     case A.TODO_MOVE: {
-      const todo = todos[action.id];
-      if (!todo) return todos;
-      const list = todosOfDate(todos, todo.date);
-      const index = list.findIndex((t) => t.id === action.id);
-      const neighbor = list[index + action.dir];
-      if (!neighbor) return todos;
-      return {
-        ...todos,
-        [todo.id]: { ...todo, order: neighbor.order },
-        [neighbor.id]: { ...neighbor, order: todo.order },
-      };
+      if (!todo || todo.time) return todos;
+      return swapWithNeighbor(todos, untimedTodos(todos, todo.date), action.id, action.dir);
     }
     default: return todos;
   }
@@ -163,7 +155,7 @@ export function initialUi({ today, syncCode, firebaseReady, route = "home" }) {
     selectedDate: today,
     statsMonth: today.slice(0, 7),
     filterTagId: null,
-    page: null,          // { type: 'habitForm', id, values } 전체 화면
+    page: null,          // { type: 'habitForm'|'todoForm', values } 전체 화면
     sheet: null,         // { type, ... } 바텀시트
     syncCode,
     syncConnected: false,

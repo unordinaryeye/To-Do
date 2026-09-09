@@ -1,6 +1,6 @@
 import { suite, assertEqual, assertDeepEqual, assertTrue } from "./harness.js";
-import { policyAt, isScheduled, withPolicy, makePolicy, scheduledHabits } from "../src/domain/schedule.js";
-import { isoWeekday, addDays, addMonths, monthKey, surroundingWeek } from "../src/utils/date.js";
+import { policyAt, isScheduled, withPolicy, alignFirstPolicy, makePolicy, scheduledHabits } from "../src/domain/schedule.js";
+import { isoWeekday, addDays, addMonths, monthKey } from "../src/utils/date.js";
 
 const habit = (overrides = {}) => ({
   id: "h1", name: "x", emoji: "✅", order: 0,
@@ -24,13 +24,6 @@ suite("date utils", (test) => {
     assertEqual(monthKey("2026-09-09"), "2026-09");
     assertEqual(addMonths("2026-12", 1), "2027-01");
     assertEqual(addMonths("2026-01", -1), "2025-12");
-  });
-  test("surroundingWeek는 선택일 ±3일", () => {
-    const week = surroundingWeek("2026-09-09");
-    assertEqual(week.length, 7);
-    assertEqual(week[0], "2026-09-06");
-    assertEqual(week[3], "2026-09-09");
-    assertEqual(week[6], "2026-09-12");
   });
 });
 
@@ -76,10 +69,26 @@ suite("schedule: policyAt / isScheduled", (test) => {
     assertTrue(isScheduled(h, "2026-09-15"));
   });
 
-  test("withPolicy는 같은 effectiveFrom을 교체하고 정렬한다", () => {
-    const policies = withPolicy([makePolicy("2026-09-10"), makePolicy("2026-09-01")], makePolicy("2026-09-10", { targetCount: 3 }));
+  test("withPolicy는 같은 날짜를 교체하고 이후 날짜의 정책은 버린다", () => {
+    const policies = withPolicy([makePolicy("2026-09-01"), makePolicy("2026-09-10"), makePolicy("2026-10-01", { repeat: { days: [6, 7] } })], makePolicy("2026-09-10", { targetCount: 3 }));
     assertDeepEqual(policies.map((p) => p.effectiveFrom), ["2026-09-01", "2026-09-10"]);
     assertEqual(policies[1].targetCount, 3);
+  });
+
+  test("미래 시작 습관을 더 이른 날짜로 고치면 옛 미래 정책이 되살아나지 않는다", () => {
+    const old = [makePolicy("2026-10-01", { repeat: { days: [6, 7] } })];
+    const h = habit({ startDate: "2026-09-25", policies: withPolicy(old, makePolicy("2026-09-25", { repeat: { days: [1] } })) });
+    assertDeepEqual(policyAt(h, "2026-10-05").repeat.days, [1]);
+    assertEqual(isScheduled(h, "2026-10-05"), true); // 월요일
+  });
+
+  test("alignFirstPolicy: 시작일을 앞당기면 첫 정책도 앞당겨 공백이 없다", () => {
+    const policies = alignFirstPolicy([makePolicy("2026-09-05"), makePolicy("2026-09-09", { repeat: { days: [1] } })], "2026-09-01");
+    assertEqual(policies[0].effectiveFrom, "2026-09-01");
+    assertEqual(policies[1].effectiveFrom, "2026-09-09");
+    const h = habit({ startDate: "2026-09-01", policies });
+    assertTrue(isScheduled(h, "2026-09-03"));
+    assertEqual(alignFirstPolicy(policies, "2026-09-03"), policies, "이미 더 이르면 그대로");
   });
 
   test("삭제된 습관은 예정 아님, scheduledHabits는 order 정렬", () => {

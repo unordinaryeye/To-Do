@@ -8,14 +8,35 @@ import { renderHome } from "./home.js";
 import { renderStats } from "./stats.js";
 import { renderGoals } from "./goals.js";
 import { renderSettings } from "./settings.js";
-import { renderHabitForm } from "./forms.js";
+import { renderHabitForm, renderTodoForm } from "./forms.js";
 import { renderSheet } from "./sheets.js";
 import { renderTabBar, hashFor, routeFromHash } from "./router.js";
 
-/** 입력 중인 텍스트. store 밖에 두어 타이핑마다 재렌더하지 않는다. */
-const drafts = { todo: "", sync: "", habitName: "", triggerText: "", todoTitle: "" };
+/** 입력 중인 값(비제어). store 밖에 두어 타이핑·피커 조작마다 재렌더하지 않는다. */
+const drafts = {
+  todo: "", sync: "",
+  habitName: "", triggerText: "", triggerTime: "", startDate: "", endDate: "",
+  todoTitle: "", todoTime: "", todoDate: "",
+};
 
 const SCREENS = { home: renderHome, stats: renderStats, goals: renderGoals, settings: renderSettings };
+const PAGES = { habitForm: renderHabitForm, todoForm: renderTodoForm };
+const IME_KEYCODE = 229;
+
+let layerWasOpen = false;
+let savedScrollY = 0;
+
+/** 시트/페이지를 history 항목으로 다뤄 iOS 뒤로가기 제스처가 앱을 빠져나가지 않게 한다. */
+function syncHistory(layerOpen) {
+  if (layerOpen && !layerWasOpen) {
+    savedScrollY = window.scrollY;
+    history.pushState({ layer: true }, "", location.href);
+  } else if (!layerOpen && layerWasOpen) {
+    if (history.state?.layer) history.back();
+    requestAnimationFrame(() => window.scrollTo(0, savedScrollY));
+  }
+  layerWasOpen = layerOpen;
+}
 
 export function render(state) {
   const { ui } = state;
@@ -24,32 +45,22 @@ export function render(state) {
   replaceContent(app, SCREENS[ui.route](state, drafts), renderTabBar(ui.route));
   app.hidden = !!ui.page; // 전체 화면 페이지가 열리면 뒤 화면을 숨겨 스크롤/포커스가 새지 않게 한다
   const layers = [];
-  if (ui.page?.type === "habitForm") layers.push(renderHabitForm(state, drafts));
+  if (ui.page && PAGES[ui.page.type]) layers.push(PAGES[ui.page.type](state, drafts));
   const sheetNode = renderSheet(state, drafts);
   if (sheetNode) layers.push(sheetNode);
   replaceContent(overlay, ...layers);
+  syncHistory(layers.length > 0);
   const wanted = hashFor(ui.route);
-  if (location.hash !== wanted) history.replaceState(null, "", wanted);
+  if (!layerWasOpen && location.hash !== wanted) history.replaceState(null, "", wanted);
 }
-
-/** 열려 있는 인라인 편집 입력(한 번에 하나) */
-const openEditInput = () => document.querySelector('input[data-action^="commit"]');
 
 function bindEvents(actions) {
   const run = (el, event) => actions[el.dataset.action]?.(el, event);
-
-  function commitOnce(target, event) {
-    if (!target || target.dataset.committed) return;
-    target.dataset.committed = "1";
-    run(target, event);
-  }
 
   document.body.addEventListener("click", (event) => {
     const el = event.target.closest("[data-action]");
     if (!el || el.tagName === "INPUT" || el.tagName === "SELECT") return;
     if (el.classList.contains("disabled") || el.disabled) return;
-    const editing = openEditInput();
-    if (editing && editing !== el) commitOnce(editing, event);
     run(el, event);
   });
   document.body.addEventListener("input", (event) => {
@@ -60,24 +71,27 @@ function bindEvents(actions) {
   });
   document.body.addEventListener("change", (event) => {
     const target = event.target;
-    if ((target.tagName === "SELECT" || target.type === "date" || target.type === "time") && target.dataset.action) run(target, event);
+    if (target.dataset.draft) drafts[target.dataset.draft] = target.value; // date/time 피커는 change로만 값을 준다
+    else if (target.tagName === "SELECT" && target.dataset.action) run(target, event);
   });
   document.body.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || event.isComposing) return;
+    if (event.key !== "Enter" || event.isComposing || event.keyCode === IME_KEYCODE) return;
     const target = event.target;
     if (target.dataset.enter) {
       event.preventDefault();
       actions[target.dataset.enter]?.(target, event);
-    } else if (target.dataset.action?.startsWith("commit")) {
-      event.preventDefault();
-      commitOnce(target, event);
     }
   });
-  document.body.addEventListener("focusout", (event) => {
-    const target = event.target;
-    if (target.dataset?.action?.startsWith("commit")) commitOnce(target, event);
-  });
   window.addEventListener("hashchange", () => actions.syncRoute(routeFromHash()));
+  window.addEventListener("popstate", (event) => { if (!event.state?.layer) actions.closeLayers(); });
+
+  // iOS: 키보드가 올라오면 fixed 바텀시트가 가려지므로 visualViewport 높이 차이만큼 밀어 올린다.
+  const vv = window.visualViewport;
+  if (vv) {
+    const update = () => document.documentElement.style.setProperty("--kb", `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+  }
 }
 
 function bindRestore(store) {

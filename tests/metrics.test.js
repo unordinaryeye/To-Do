@@ -1,4 +1,4 @@
-import { suite, assertEqual, assertDeepEqual } from "./harness.js";
+import { suite, assertEqual, assertDeepEqual, assertTrue } from "./harness.js";
 import { dayStatus, dayProgress, globalStreak, habitStreak } from "../src/domain/metrics.js";
 import { makePolicy } from "../src/domain/schedule.js";
 
@@ -14,13 +14,24 @@ const mwf = (id) => habit(id, { policies: [makePolicy("2026-09-01", { repeat: { 
 suite("metrics: dayStatus / dayProgress", (test) => {
   test("예정 습관이 없으면 done/partial 모두 false", () => {
     const status = dayStatus({}, {}, "2026-09-09");
-    assertDeepEqual(status, { scheduled: 0, done: 0, allDone: false, partial: false, pct: null });
+    assertDeepEqual(status, { scheduled: 0, done: 0, allDone: false, pct: null });
   });
 
-  test("일부 달성은 partial, 전부 달성은 allDone", () => {
+  test("일부 달성은 pct 50, 전부 달성은 allDone", () => {
     const habits = { a: habit("a"), b: habit("b") };
-    assertEqual(dayStatus(habits, { "2026-09-09": { a: 1 } }, "2026-09-09").partial, true);
+    assertEqual(dayStatus(habits, { "2026-09-09": { a: 1 } }, "2026-09-09").pct, 50);
     assertEqual(dayStatus(habits, { "2026-09-09": { a: 1, b: 1 } }, "2026-09-09").allDone, true);
+  });
+
+  test("정책이 최근에만 있는 습관도 스트릭 계산이 기록 범위 안에서 끝난다(성능)", () => {
+    const habits = {};
+    for (let i = 0; i < 10; i++) {
+      habits[`h${i}`] = habit(`h${i}`, { startDate: "2000-01-01", policies: [makePolicy("2026-09-09")] });
+    }
+    const checks = { "2026-09-09": { h0: 1 } };
+    const t0 = Date.now();
+    for (let i = 0; i < 20; i++) globalStreak(habits, checks, "2026-09-09");
+    assertTrue(Date.now() - t0 < 200, "20회 호출이 200ms 안에 끝나야 함");
   });
 
   test("예정 아닌 요일의 습관은 분모에서 빠진다", () => {

@@ -7,10 +7,10 @@ import { downloadBackup } from "../storage/backup.js";
 import { defaultData } from "../domain/migrate.js";
 import { REPEAT_PRESETS } from "../domain/format.js";
 import { habitFormValues, todoFormValues } from "../state/selectors.js";
-import { isHabitFormValid } from "./forms.js";
+import { habitFormError, initHabitDrafts, initTodoDrafts } from "./forms.js";
 import { toast } from "./toast.js";
 
-/** data-action 이름 → 핸들러(el, event). drafts는 입력 중인 텍스트. */
+/** data-action 이름 → 핸들러(el, event). drafts는 입력 중인 텍스트·날짜·시간(비제어). */
 export function createActions({ store, sync, drafts }) {
   const { dispatch, getState } = store;
   const ui = (patch) => dispatch({ type: A.UI_SET, patch });
@@ -20,6 +20,7 @@ export function createActions({ store, sync, drafts }) {
   const navigation = {
     goRoute: (el) => ui({ route: el.dataset.route, sheet: null, page: null }),
     syncRoute: (route) => { if (getState().ui.route !== route) ui({ route, sheet: null, page: null }); },
+    closeLayers: () => { if (getState().ui.sheet || getState().ui.page) closeAll(); },
     openSettingsRoute: () => ui({ route: "settings" }),
     setHomeTab: (el) => ui({ homeTab: el.dataset.tab }),
     moveDate: (el) => ui({ selectedDate: addDays(selected(), Number(el.dataset.n)) }),
@@ -34,17 +35,18 @@ export function createActions({ store, sync, drafts }) {
     },
     closePage: () => ui({ page: null, sheet: null }),
     openFab: () => ui({ sheet: { type: "fab" } }),
+    openEnded: () => ui({ sheet: { type: "ended" } }),
   };
 
-  // ── 폼 값 편집. 시트(빠른 설정)가 열려 있으면 시트 값을, 아니면 페이지 값을 고친다 ──
-  function formValues() {
+  // ── 폼 값(재렌더가 필요한 값). 값이 있는 시트가 열려 있으면 시트, 아니면 페이지 ──
+  const formHolder = () => {
     const { sheet, page } = getState().ui;
-    return sheet?.values ? sheet.values : page?.values;
-  }
+    return sheet?.values ? ["sheet", sheet] : page?.values ? ["page", page] : [null, null];
+  };
+  const formValues = () => formHolder()[1]?.values;
   function patchForm(patch) {
-    const { sheet, page } = getState().ui;
-    if (sheet?.values) ui({ sheet: { ...sheet, values: { ...sheet.values, ...patch } } });
-    else if (page?.values) ui({ page: { ...page, values: { ...page.values, ...patch } } });
+    const [key, holder] = formHolder();
+    if (key) ui({ [key]: { ...holder, values: { ...holder.values, ...patch } } });
   }
 
   const form = {
@@ -55,25 +57,27 @@ export function createActions({ store, sync, drafts }) {
     formToggleDay: (el) => {
       const day = Number(el.dataset.day);
       const days = formValues().repeatDays;
-      patchForm({ repeatDays: days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort() });
+      patchForm({ repeatDays: days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b) });
     },
     formTriggerType: (el) => patchForm({ triggerType: el.dataset.triggerType }),
-    formTriggerTime: (el) => patchForm({ triggerTime: isValidTime(el.value) ? el.value : "" }),
-    formTriggerSuggest: (el) => {
-      drafts.triggerText = el.dataset.text;
-      patchForm({}); // 재렌더로 칩 선택 상태 반영
-      focusById("triggerTextField");
-    },
-    formDate: (el) => { if (isValidDateKey(el.value)) patchForm({ [el.dataset.field]: el.value }); },
-    formClearDate: (el) => patchForm({ [el.dataset.field]: "" }),
+    formTriggerSuggest: (el) => { drafts.triggerText = el.dataset.text; patchForm({}); focusById("triggerTextField"); },
+    formClearDate: (el) => { drafts[el.dataset.draft] = ""; patchForm({}); },
     openEmojiSheet: () => ui({ sheet: { type: "emoji" } }),
     formEmoji: (el) => { patchForm({ emoji: el.dataset.emoji }); ui({ sheet: null }); },
   };
 
   function triggerFromForm(values) {
-    if (values.triggerType === "time") return { type: "time", value: values.triggerTime };
-    if (values.triggerType === "context") return drafts.triggerText.trim() ? { type: "context", value: drafts.triggerText.trim() } : null;
+    if (values.triggerType === "time") return { type: "time", value: drafts.triggerTime };
+    if (values.triggerType === "context") return { type: "context", value: drafts.triggerText.trim() };
     return null;
+  }
+
+  function habitPayload(values, name, emoji) {
+    return {
+      type: A.HABIT_UPSERT, id: values.id, name, emoji,
+      startDate: drafts.startDate, endDate: drafts.endDate || null,
+      repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
+    };
   }
 
   const habits = {
@@ -81,40 +85,36 @@ export function createActions({ store, sync, drafts }) {
     openHabitActions: (el) => ui({ sheet: { type: "habitActions", id: el.dataset.id } }),
     openHabitForm: (el) => {
       const values = habitFormValues(getState().data, el?.dataset.id || null, todayKey());
-      drafts.habitName = values.name;
-      drafts.triggerText = values.triggerText;
+      initHabitDrafts(drafts, values);
       ui({ sheet: null, page: { type: "habitForm", values } });
       if (!values.id) focusById("habitNameField");
     },
     openSchedule: (el) => {
       const values = habitFormValues(getState().data, el.dataset.id, todayKey());
-      drafts.triggerText = values.triggerText;
+      initHabitDrafts(drafts, values);
       ui({ sheet: { type: "schedule", values } });
     },
     submitHabitForm: () => {
       const values = getState().ui.page?.values;
-      if (!values || !isHabitFormValid(values, drafts)) { toast("⚠️", "이름과 반복 요일을 확인해 주세요"); return; }
-      dispatch({
-        type: A.HABIT_UPSERT, id: values.id, name: drafts.habitName.trim(), emoji: values.emoji,
-        startDate: values.startDate, endDate: values.endDate || null,
-        repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
-      });
+      const error = values && habitFormError(values, drafts, todayKey());
+      if (!values || error) { toast("⚠️", error || "입력을 확인해 주세요"); return; }
+      dispatch(habitPayload(values, drafts.habitName.trim(), values.emoji));
       closeAll();
       toast("✅", values.id ? "루틴을 저장했어요" : "루틴을 시작했어요");
     },
     submitSchedule: () => {
       const values = getState().ui.sheet?.values;
       const habit = values && getState().data.habits[values.id];
-      if (!habit || !values.repeatDays.length) return;
-      dispatch({
-        type: A.HABIT_UPSERT, id: values.id, name: habit.name, emoji: habit.emoji,
-        startDate: values.startDate, endDate: values.endDate || null,
-        repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
-      });
+      const error = habit && habitFormError(values, drafts, todayKey(), { requireName: false });
+      if (!habit || error) { toast("⚠️", error || "입력을 확인해 주세요"); return; }
+      dispatch(habitPayload(values, habit.name, habit.emoji));
       ui({ sheet: null });
-      toast("✅", "오늘부터 적용돼요");
+      toast("✅", drafts.startDate > todayKey() ? "시작 날짜부터 적용돼요" : "오늘부터 적용돼요");
     },
-    moveHabit: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir) }),
+    moveHabit: (el) => dispatch({ type: A.HABIT_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir), date: selected() }),
+    askEndHabit: (el) => ui({ sheet: { type: "confirmEndHabit", id: el.dataset.id } }),
+    endHabit: (el) => { dispatch({ type: A.HABIT_END, id: el.dataset.id, date: addDays(todayKey(), -1) }); closeAll(); toast("⛔", "루틴을 끝냈어요. 내정보에서 다시 시작할 수 있어요"); },
+    resumeHabit: (el) => { dispatch({ type: A.HABIT_RESUME, id: el.dataset.id }); toast("▶️", "루틴을 다시 시작했어요"); },
     askDeleteHabit: (el) => ui({ sheet: { type: "confirmDeleteHabit", id: el.dataset.id } }),
     deleteHabit: (el) => { dispatch({ type: A.HABIT_DELETE, id: el.dataset.id }); closeAll(); toast("🗑", "루틴을 삭제했어요"); },
   };
@@ -124,20 +124,18 @@ export function createActions({ store, sync, drafts }) {
     openTodoActions: (el) => ui({ sheet: { type: "todoActions", id: el.dataset.id } }),
     openTodoForm: (el) => {
       const values = todoFormValues(getState().data, el?.dataset.id || null, selected());
-      drafts.todoTitle = values.title;
-      ui({ sheet: { type: "todoForm", values } });
+      initTodoDrafts(drafts, values);
+      ui({ sheet: null, page: { type: "todoForm", values } });
       focusById("todoTitleField");
     },
-    formTodoTime: (el) => patchForm({ time: isValidTime(el.value) ? el.value : "" }),
-    formTodoTimeClear: () => patchForm({ time: "" }),
-    formTodoDate: (el) => { if (isValidDateKey(el.value)) patchForm({ date: el.value }); },
     submitTodoForm: () => {
-      const values = getState().ui.sheet?.values;
+      const values = getState().ui.page?.values;
       const title = drafts.todoTitle.trim();
       if (!values || !title) { toast("⚠️", "할 일을 입력해 주세요"); return; }
-      dispatch({ type: A.TODO_UPSERT, id: values.id, title, date: values.date, time: values.time || null });
-      drafts.todoTitle = "";
-      ui({ sheet: null, selectedDate: values.date, homeTab: "todos" });
+      if (!isValidDateKey(drafts.todoDate)) { toast("⚠️", "날짜를 확인해 주세요"); return; }
+      const time = isValidTime(drafts.todoTime) ? drafts.todoTime : null;
+      dispatch({ type: A.TODO_UPSERT, id: values.id, title, date: drafts.todoDate, time });
+      ui({ page: null, sheet: null, selectedDate: drafts.todoDate, homeTab: "todos" });
     },
     quickAddTodo: () => {
       const title = drafts.todo.trim();
@@ -148,7 +146,7 @@ export function createActions({ store, sync, drafts }) {
     },
     moveTodo: (el) => dispatch({ type: A.TODO_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir) }),
     askDeleteTodo: (el) => ui({ sheet: { type: "confirmDeleteTodo", id: el.dataset.id } }),
-    deleteTodo: (el) => { dispatch({ type: A.TODO_DELETE, id: el.dataset.id }); ui({ sheet: null }); },
+    deleteTodo: (el) => { dispatch({ type: A.TODO_DELETE, id: el.dataset.id }); closeAll(); },
   };
 
   const data = {

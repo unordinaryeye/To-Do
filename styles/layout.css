@@ -40,14 +40,12 @@
 
 /* 세그먼트 탭 */
 .segment{display:flex;background:var(--line-2);border-radius:14px 14px 0 0;position:relative}
-.segment .sort-btn{width:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px}
 .seg-btn{flex:1;padding:14px 0;font-size:16px;font-weight:600;color:var(--muted);border-radius:14px 14px 0 0;transition:all .2s}
 .seg-btn.active{background:var(--card);color:var(--accent-dark)}
 .home-body{background:var(--card);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:14px 12px 96px;min-height:320px}
 
 /* 필터 행 */
 .filter-row{display:flex;align-items:center;gap:8px;overflow-x:auto;padding-bottom:12px}
-.filter-row .spacer{flex:1}
 
 /* 표 */
 .table{display:flex;flex-direction:column;gap:8px}
@@ -96,7 +94,7 @@
 /* 바텀시트 */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:80;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .overlay.center{align-items:center}
-.sheet{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:640px;padding:12px 20px calc(20px + env(safe-area-inset-bottom));animation:slideUp .25s ease;max-height:88vh;overflow-y:auto}
+.sheet{margin-bottom:var(--kb,0px);background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:640px;padding:12px 20px calc(20px + env(safe-area-inset-bottom));animation:slideUp .25s ease;max-height:88vh;overflow-y:auto}
 .sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 16px}
 .sheet-title{font-size:16px;font-weight:700;margin-bottom:4px}
 .sheet-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
@@ -105,7 +103,10 @@
 /* 통계 */
 .stats-head{display:flex;align-items:center;justify-content:center;gap:16px;padding:10px 0 14px;font-size:18px;font-weight:700}
 .stats-head .arrow{width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:20px}
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stats-head .arrow.dim{opacity:.3}
+.day-grid.head{margin-bottom:3px}
+.day-grid.head .day-cell{aspect-ratio:auto;height:14px;font-size:9px;font-family:var(--font);color:var(--muted)}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .habit-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 10px}
 .habit-card .hc-title{font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}

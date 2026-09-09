@@ -10,8 +10,9 @@ export function renderGoals(state) {
   const today = todayKey();
   const { habits, checks, goalTags } = state.data;
   const stats = monthlyStats(habits, checks, today.slice(0, 7), today);
+  const active = activeHabits(state.data);
   const rows = Object.values(goalTags).filter((tag) => !tag.archived).map((tag) => {
-    const members = activeHabits(state.data).filter((habit) => (currentPolicy(habit, today)?.goalTagIds || []).includes(tag.id));
+    const members = active.filter((habit) => (currentPolicy(habit, today)?.goalTagIds || []).includes(tag.id));
     const memberRows = stats.perHabit.filter((row) => members.some((m) => m.id === row.habit.id));
     const scheduled = memberRows.reduce((s, r) => s + r.scheduled, 0);
     const done = memberRows.reduce((s, r) => s + r.done, 0);

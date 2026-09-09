@@ -27,23 +27,6 @@ export function appendChildren(el, children) {
   return el;
 }
 
-export function svgCheck() {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("width", "12");
-  svg.setAttribute("height", "12");
-  svg.setAttribute("viewBox", "0 0 12 12");
-  svg.setAttribute("fill", "none");
-  const path = document.createElementNS(ns, "path");
-  path.setAttribute("d", "M2.5 6L5 8.5L9.5 3.5");
-  path.setAttribute("stroke", "#fff");
-  path.setAttribute("stroke-width", "2");
-  path.setAttribute("stroke-linecap", "round");
-  path.setAttribute("stroke-linejoin", "round");
-  svg.append(path);
-  return svg;
-}
-
 /** 기존 노드를 새 노드로 교체하되, 포커스가 있던 input이 같은 id로 다시 있으면 포커스를 되살린다. */
 export function replaceContent(root, ...nodes) {
   const active = document.activeElement;

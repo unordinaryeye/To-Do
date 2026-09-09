@@ -25,7 +25,6 @@ export function dayStatus(habits, checks, dateKey) {
     scheduled: scheduled.length,
     done: doneCount,
     allDone: scheduled.length > 0 && doneCount === scheduled.length,
-    partial: doneCount > 0 && doneCount < scheduled.length,
     pct: scheduled.length ? (doneCount / scheduled.length) * 100 : null,
   };
 }
@@ -39,10 +38,15 @@ export function dayProgress(habits, checks, todos, dateKey) {
   return { done, total, pct: total ? (done / total) * 100 : 0 };
 }
 
-function earliestStart(habits) {
-  return Object.values(habits).reduce((min, habit) => (
-    !min || compareKeys(habit.startDate, min) < 0 ? habit.startDate : min
-  ), null);
+const earliestCheckCache = new WeakMap();
+
+/** 기록이 하나도 없는 날 이전에는 달성한 날이 있을 수 없으므로 스트릭 탐색 하한으로 쓴다. */
+function earliestCheckDate(checks) {
+  if (earliestCheckCache.has(checks)) return earliestCheckCache.get(checks);
+  const keys = Object.keys(checks);
+  const min = keys.length ? keys.reduce((a, b) => (compareKeys(a, b) <= 0 ? a : b)) : null;
+  earliestCheckCache.set(checks, min);
+  return min;
 }
 
 /**
@@ -50,8 +54,8 @@ function earliestStart(habits) {
  * 예정 습관이 없는 날은 건너뛴다. 선택일 당일이 미달성이면 유예하고 전날부터 센다.
  */
 export function globalStreak(habits, checks, anchorKey) {
-  const floor = earliestStart(habits);
-  if (!floor) return 0;
+  const floor = earliestCheckDate(checks);
+  if (!floor || Object.keys(habits).length === 0) return 0;
   let streak = 0;
   let key = anchorKey;
   for (let i = 0; i < MAX_LOOKBACK_DAYS && compareKeys(key, floor) >= 0; i++) {
@@ -69,9 +73,11 @@ export function globalStreak(habits, checks, anchorKey) {
 
 /** 습관 하나의 스트릭: 예정된 날만 따라가며 연속 달성 수. 기준일 당일만 미완료 유예. */
 export function habitStreak(habit, checks, anchorKey) {
+  const floor = earliestCheckDate(checks);
+  if (!floor) return 0;
   let streak = 0;
   let key = anchorKey;
-  for (let i = 0; i < MAX_LOOKBACK_DAYS && compareKeys(key, habit.startDate) >= 0; i++) {
+  for (let i = 0; i < MAX_LOOKBACK_DAYS && compareKeys(key, habit.startDate) >= 0 && compareKeys(key, floor) >= 0; i++) {
     if (isScheduled(habit, key)) {
       if (isHabitDone(habit, checks, key)) streak++;
       else if (key !== anchorKey) break;
@@ -105,12 +111,31 @@ export function monthlyStats(habits, checks, month, todayKey) {
     .filter((row) => row.scheduled > 0 || Object.values(row.cells).some((c) => c === "future"));
 
   const totals = perHabit.reduce((acc, row) => ({ scheduled: acc.scheduled + row.scheduled, done: acc.done + row.done }), { scheduled: 0, done: 0 });
-  const greenDays = days.filter((day) => compareKeys(day, todayKey) <= 0 && dayStatus(habits, checks, day).allDone).length;
+  const pastDays = days.filter((day) => compareKeys(day, todayKey) <= 0);
+  const green = pastDays.map((day) => dayStatus(habits, checks, day).allDone);
   return {
     month,
     days,
     perHabit,
     pct: totals.scheduled ? Math.round((totals.done / totals.scheduled) * 100) : null,
-    greenDays,
+    greenDays: green.filter(Boolean).length,
+    longestStreak: longestRun(green),
   };
+}
+
+function longestRun(flags) {
+  let best = 0;
+  let run = 0;
+  for (const flag of flags) {
+    run = flag ? run + 1 : 0;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+/** 월간 투두 집계 */
+export function monthlyTodoStats(todos, month) {
+  const list = Object.values(todos).filter((t) => t.date.startsWith(month));
+  const done = list.filter((t) => t.done).length;
+  return { total: list.length, done, pct: list.length ? Math.round((done / list.length) * 100) : null };
 }

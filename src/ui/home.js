@@ -7,19 +7,21 @@ import { repeatLabel, triggerLabel } from "../domain/format.js";
 import { needsBackupReminder } from "../storage/local.js";
 import { chip, emptyState } from "./parts.js";
 
+const SWIPE_MIN_PX = 40;
+
 function header(state) {
   const { selectedDate } = state.ui;
   const streak = globalStreak(state.data.habits, state.data.checks, todayKey());
   return h("div", { class: "home-head" },
-    h("button", { class: "month-btn", dataset: { action: "goToday" } }, formatMonthKR(monthKey(selectedDate)), h("span", { class: "chev" }, "▾")),
+    h("button", { class: "month-btn", dataset: { action: "goToday" }, title: "오늘로 이동" }, formatMonthKR(monthKey(selectedDate))),
     h("div", { class: "head-right" },
-      h("div", { class: `streak-badge${streak > 0 ? " hot" : ""}` }, "🔥", String(streak)),
+      h("div", { class: `streak-badge${streak > 0 ? " hot" : ""}`, "aria-label": `연속 ${streak}일` }, "🔥", String(streak)),
       h("button", { class: "icon-btn", dataset: { action: "openSettingsRoute" }, "aria-label": "설정" }, "⋯"),
     ),
   );
 }
 
-function donut(status, dayNum, selected) {
+function donut(status, dayNum) {
   const pct = status.pct;
   const cls = ["donut", status.allDone && "green", pct == null && "none"].filter(Boolean).join(" ");
   const style = pct != null && !status.allDone
@@ -29,6 +31,20 @@ function donut(status, dayNum, selected) {
     h("span", { class: "num" }, String(dayNum)));
 }
 
+/** 좌우 스와이프로 주 이동. 핸들러는 이벤트 위임과 별개로 이 노드에만 붙인다. */
+function attachSwipe(node) {
+  let startX = null;
+  node.addEventListener("pointerdown", (e) => { startX = e.clientX; }, { passive: true });
+  node.addEventListener("pointerup", (e) => {
+    if (startX == null) return;
+    const dx = e.clientX - startX;
+    startX = null;
+    if (Math.abs(dx) < SWIPE_MIN_PX) return;
+    node.querySelector(`[data-action="moveDate"][data-n="${dx < 0 ? 7 : -7}"]`)?.click();
+  });
+  return node;
+}
+
 function weekStrip(state) {
   const { selectedDate } = state.ui;
   const { habits, checks, settings } = state.data;
@@ -36,27 +52,27 @@ function weekStrip(state) {
   const days = weekOf(selectedDate, settings.weekStart ?? 1).map((key) => {
     const status = dayStatus(habits, checks, key);
     const cls = ["week-day", key === selectedDate && "selected", key === today && "today"].filter(Boolean).join(" ");
-    return h("button", { class: cls, dataset: { action: "selectDate", date: key } },
+    return h("button", { class: cls, dataset: { action: "selectDate", date: key }, "aria-pressed": String(key === selectedDate) },
       h("span", { class: "lbl" }, ISO_DAYS_KR[isoWeekday(key)]),
-      donut(status, fromDateKey(key).getDate(), key === selectedDate),
+      donut(status, fromDateKey(key).getDate()),
     );
   });
-  return h("div", { class: "week-strip" },
+  return attachSwipe(h("div", { class: "week-strip" },
     h("button", { class: "arrow", dataset: { action: "moveDate", n: "-7" }, "aria-label": "지난주" }, "‹"),
     h("div", { class: "week-days" }, days),
     h("button", { class: "arrow", dataset: { action: "moveDate", n: "7" }, "aria-label": "다음주" }, "›"),
-  );
+  ));
 }
 
 function segment(tab) {
-  const btn = (id, label) => h("button", { class: `seg-btn${tab === id ? " active" : ""}`, dataset: { action: "setHomeTab", tab: id } }, label);
-  return h("div", { class: "segment" }, btn("habits", "루틴"), btn("todos", "투두"));
+  const btn = (id, label) => h("button", { class: `seg-btn${tab === id ? " active" : ""}`, dataset: { action: "setHomeTab", tab: id }, "aria-pressed": String(tab === id) }, label);
+  return h("div", { class: "segment", role: "tablist" }, btn("habits", "루틴"), btn("todos", "투두"));
 }
 
 function filterRow(state) {
   const tags = tagsInUse(state.data, todayKey());
   return h("div", { class: "filter-row" },
-    chip("하루", { dark: true }),
+    h("span", { class: "chip dark" }, "하루"),
     tags.map((tag) => chip(`${tag.emoji} ${tag.name}`, {
       on: state.ui.filterTagId === tag.id,
       dataset: { action: "toggleFilterTag", id: tag.id },
@@ -64,9 +80,16 @@ function filterRow(state) {
   );
 }
 
-function whenCell(habit, policy, clock24, dataset) {
+function checkCell(done, label, dataset, extraClass = "") {
+  return h("div", {
+    class: `cell check${extraClass}${done ? " on check-pop" : ""}`,
+    dataset, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": label,
+  });
+}
+
+function whenCell(policy, clock24, dataset) {
   const trigger = policy?.trigger;
-  return h("div", { class: "cell when", dataset },
+  return h("div", { class: "cell when", dataset, role: "button", tabindex: "0", "aria-label": "시간과 반복 요일 설정" },
     h("span", { class: `t${trigger?.type === "context" ? " ctx" : ""}` }, triggerLabel(trigger, clock24)),
     h("span", { class: "d" }, repeatLabel(policy?.repeat.days)),
   );
@@ -78,14 +101,15 @@ function habitRow(habit, index, state) {
   const done = isHabitDone(habit, checks, selectedDate);
   const policy = currentPolicy(habit, selectedDate);
   const streak = habitStreak(habit, checks, selectedDate);
+  const check = checkCell(done, habit.name, { action: "toggleCheck", id: habit.id });
+  check.textContent = done ? habit.emoji : "";
   return h("div", { class: "row", dataset: { habitId: habit.id } },
-    h("div", { class: `cell check${done ? " on check-pop" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", "aria-checked": String(done), "aria-label": habit.name },
-      done ? habit.emoji : ""),
-    whenCell(habit, policy, settings.clock24, { action: "openSchedule", id: habit.id }),
-    h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id } },
+    check,
+    whenCell(policy, settings.clock24, { action: "openSchedule", id: habit.id }),
+    h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
       h("span", { class: "rank" }, String(index + 1)),
       h("span", { class: "txt" }, `${habit.emoji} ${habit.name}`),
-      streak > 0 ? h("span", { class: "fire hot" }, `🔥${streak}`) : null,
+      streak > 0 ? h("span", { class: "fire hot", "aria-label": `연속 ${streak}회` }, `🔥${streak}`) : null,
     ),
   );
 }
@@ -102,15 +126,15 @@ function habitsTab(state) {
   return h("div", { class: "table" }, habits.map((habit, i) => habitRow(habit, i, state)));
 }
 
-function todoRow(todo, index, state) {
-  const today = todayKey();
-  const late = todo.time && !todo.done && state.ui.selectedDate === today && todo.time < new Date().toTimeString().slice(0, 5);
+function todoRow(todo, index, state, now) {
+  const late = todo.time && !todo.done && state.ui.selectedDate === todayKey() && todo.time < now;
+  const check = checkCell(todo.done, todo.title, { action: "toggleTodo", id: todo.id }, " todo");
+  check.textContent = todo.done ? "✔" : "";
   return h("div", { class: "row todo-row" },
-    h("div", { class: `cell check todo${todo.done ? " on check-pop" : ""}`, dataset: { action: "toggleTodo", id: todo.id }, role: "checkbox", "aria-checked": String(todo.done) },
-      todo.done ? "✔" : ""),
-    h("div", { class: "cell when", dataset: { action: "openTodoForm", id: todo.id } },
+    check,
+    h("div", { class: "cell when", dataset: { action: "openTodoForm", id: todo.id }, role: "button", tabindex: "0", "aria-label": "시간 설정" },
       h("span", { class: `t${late ? " late" : ""}` }, todo.time ? `${todo.time}${late ? "!" : ""}` : "–")),
-    h("div", { class: "cell name", dataset: { action: "openTodoActions", id: todo.id } },
+    h("div", { class: "cell name", dataset: { action: "openTodoActions", id: todo.id }, role: "button", tabindex: "0" },
       h("span", { class: "rank" }, String(index + 1)),
       h("span", { class: `txt${todo.done ? " done" : ""}` }, todo.title),
     ),
@@ -119,12 +143,13 @@ function todoRow(todo, index, state) {
 
 function todosTab(state, drafts) {
   const todos = todosForDate(state.data, state.ui.selectedDate);
+  const now = new Date().toTimeString().slice(0, 5);
   return h("div", null,
     todos.length
-      ? h("div", { class: "table" }, todos.map((todo, i) => todoRow(todo, i, state)))
+      ? h("div", { class: "table" }, todos.map((todo, i) => todoRow(todo, i, state, now)))
       : emptyState("📌", "할 일이 없어요", "아래 입력창이나 + 버튼으로 추가해요"),
     h("div", { class: "quick-add" },
-      h("input", { id: "todoInputField", value: drafts.todo, placeholder: "할 일 빠른 추가", dataset: { draft: "todo", enter: "quickAddTodo" } }),
+      h("input", { id: "todoInputField", value: drafts.todo, placeholder: "할 일 빠른 추가", maxlength: "60", dataset: { draft: "todo", enter: "quickAddTodo" }, "aria-label": "할 일 빠른 추가" }),
       h("button", { class: "btn dark", dataset: { action: "quickAddTodo" } }, "추가"),
     ),
   );
@@ -136,7 +161,7 @@ function completeBanner(state) {
   const progress = dayProgress(habits, checks, todosForDate(state.data, selectedDate), selectedDate);
   if (progress.total === 0 || progress.pct < 100) return null;
   return h("div", { class: "complete-banner fade-in" },
-    h("div", { style: { fontSize: "36px", marginBottom: "8px" } }, "🎉"),
+    h("div", { class: "big-emoji" }, "🎉"),
     h("p", { class: "complete-main" }, "오늘 할 일 모두 완료!"),
     h("p", { class: "complete-sub" }, "대단해요, 꾸준함이 실력입니다"),
   );
@@ -147,8 +172,8 @@ export function renderHome(state, drafts) {
   return h("div", { class: "screen fade-in" },
     header(state),
     weekStrip(state),
-    needsBackupReminder(state.data, state.ui.syncCode) ? h("div", { class: "backup-banner", dataset: { action: "goRoute", route: "settings" } },
-      h("span", { style: { fontSize: "22px" } }, "💾"),
+    needsBackupReminder(state.data, state.ui.syncCode) ? h("div", { class: "backup-banner", dataset: { action: "goRoute", route: "settings" }, role: "button", tabindex: "0" },
+      h("span", { class: "big-emoji sm" }, "💾"),
       h("div", null, h("div", { class: "banner-main" }, "데이터 백업을 해두면 안전해요"), h("div", { class: "banner-sub" }, "탭해서 백업하기 →")),
     ) : null,
     segment(tab),
