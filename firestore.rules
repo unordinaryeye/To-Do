@@ -16,8 +16,9 @@ service cloud.firestore {
       allow read: if isCode(code);
       allow create, update: if isCode(code) && request.resource.data.keys().hasOnly(['schemaVersion', 'updatedAt']);
       allow delete: if false;
+      // 읽기는 컬렉션 전체 구독을 쓰므로 문서 이름 조건을 걸 수 없다(쿼리 단위로 증명 불가 → 전체 거부됨).
       match /data/{doc} {
-        allow read: if isCode(code) && validDoc(doc);
+        allow read: if isCode(code);
         allow create, update: if isCode(code) && validDoc(doc);
         allow delete: if false;
       }
