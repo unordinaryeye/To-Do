@@ -1,7 +1,9 @@
 import { h } from "../utils/dom.js";
-import { formatBackupTime } from "../utils/date.js";
+import { formatBackupTime, ISO_DAYS_KR } from "../utils/date.js";
 import { activeHabits, recordedDayCount } from "../state/selectors.js";
 import { getLastBackup } from "../storage/local.js";
+import { SCHEMA_VERSION } from "../config.js";
+import { listItem } from "./parts.js";
 
 function syncSection(ui, draft) {
   if (!ui.firebaseReady) {
@@ -30,44 +32,29 @@ function syncSection(ui, draft) {
   );
 }
 
-function settingsItem(icon, iconBg, main, sub, dataset, extraClass = "") {
-  return h("div", { class: `settings-item ${extraClass}`.trim(), dataset },
-    h("div", { class: "si-icon", style: { background: iconBg } }, icon),
-    h("div", { class: "si-text" }, h("div", { class: "main" }, main), h("div", { class: "sub" }, sub)),
+function weekStartRow(settings) {
+  const current = settings.weekStart ?? 1;
+  return h("div", { class: "list-item static" },
+    h("div", { class: "li-icon" }, "🗓"),
+    h("div", { class: "li-text" }, h("div", { class: "main" }, "주 시작 요일"), h("div", { class: "sub" }, "주간 행과 통계 그리드에 적용")),
+    h("div", { class: "li-right" }, h("select", { dataset: { action: "setWeekStart" } },
+      [1, 7, 6].map((d) => h("option", { value: String(d), selected: current === d }, `${ISO_DAYS_KR[d]}요일`)))),
   );
 }
 
 export function renderSettings(state, drafts) {
   const habitCount = activeHabits(state.data).length;
   const days = recordedDayCount(state.data);
-  return h("div", { class: "overlay", dataset: { action: "closeOverlay" } },
-    h("div", { class: "settings-panel" },
-      h("div", { class: "panel-handle" }),
-      h("div", { class: "panel-head" },
-        h("div", { class: "panel-title", style: { marginBottom: "0" } }, "설정"),
-        h("button", { class: "panel-close", dataset: { action: "closeSettings" }, "aria-label": "닫기" }, "✕"),
-      ),
-      syncSection(state.ui, drafts.sync),
-      h("div", { class: "section-divider" }),
-      settingsItem("💾", "#DBEAFE", "데이터 백업", `파일로 백업 · 마지막: ${formatBackupTime(getLastBackup())}`, { action: "backup" }),
-      settingsItem("📂", "#FEF3C7", "데이터 복원", "백업 파일에서 복원", { action: "restore" }),
-      settingsItem("📊", "#F3E8FF", "내 기록", `루틴 ${habitCount}개 · 기록된 날 ${days}일`, {}, "settings-info"),
-      h("div", { style: { height: "8px" } }),
-      settingsItem("🗑️", "#FEE2E2", "전체 초기화", "모든 데이터 삭제", { action: "askReset" }, "settings-danger"),
-      h("button", { class: "panel-close-btn", dataset: { action: "closeSettings" } }, "닫기"),
-    ),
-  );
-}
-
-export function renderConfirmReset() {
-  return h("div", { class: "overlay center", dataset: { action: "closeOverlay" } },
-    h("div", { class: "confirm-box" },
-      h("div", { style: { fontSize: "36px", marginBottom: "12px" } }, "⚠️"),
-      h("div", { class: "msg" }, "모든 루틴과 기록이 삭제됩니다.", h("br"), "정말 초기화할까요?"),
-      h("div", { class: "btns" },
-        h("button", { class: "btn-cancel", dataset: { action: "closeConfirm" } }, "취소"),
-        h("button", { class: "btn-danger", dataset: { action: "reset" } }, "초기화"),
-      ),
-    ),
+  return h("div", { class: "screen fade-in" },
+    h("div", { class: "page-title" }, "내정보"),
+    syncSection(state.ui, drafts.sync),
+    h("div", { class: "section-divider" }),
+    listItem({ icon: "💾", iconBg: "#DBEAFE", main: "데이터 백업", sub: `파일로 백업 · 마지막: ${formatBackupTime(getLastBackup())}`, dataset: { action: "backup" } }),
+    listItem({ icon: "📂", iconBg: "#FEF3C7", main: "데이터 복원", sub: "백업 파일에서 복원", dataset: { action: "restore" } }),
+    weekStartRow(state.data.settings),
+    listItem({ icon: "📊", iconBg: "#F3E8FF", main: "내 기록", sub: `루틴 ${habitCount}개 · 기록된 날 ${days}일`, isStatic: true }),
+    h("div", { style: { height: "8px" } }),
+    listItem({ icon: "🗑️", iconBg: "#FEE2E2", main: "전체 초기화", sub: "모든 데이터 삭제", dataset: { action: "askReset" }, danger: true }),
+    h("div", { class: "version" }, `Daily Routine · 데이터 스키마 v${SCHEMA_VERSION}`),
   );
 }

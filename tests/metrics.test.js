@@ -14,7 +14,7 @@ const mwf = (id) => habit(id, { policies: [makePolicy("2026-09-01", { repeat: { 
 suite("metrics: dayStatus / dayProgress", (test) => {
   test("예정 습관이 없으면 done/partial 모두 false", () => {
     const status = dayStatus({}, {}, "2026-09-09");
-    assertDeepEqual(status, { scheduled: 0, done: 0, allDone: false, partial: false });
+    assertDeepEqual(status, { scheduled: 0, done: 0, allDone: false, partial: false, pct: null });
   });
 
   test("일부 달성은 partial, 전부 달성은 allDone", () => {

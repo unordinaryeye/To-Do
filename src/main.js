@@ -6,6 +6,7 @@ import { loadData, saveData, getSyncCode } from "./storage/local.js";
 import { createSync } from "./sync/firestore.js";
 import { mountApp, render } from "./ui/app.js";
 import { toast } from "./ui/toast.js";
+import { routeFromHash } from "./ui/router.js";
 
 const today = todayKey();
 const { data, migrated, warnings } = loadData(today);
@@ -25,7 +26,7 @@ const sync = createSync({
 const syncCode = getSyncCode();
 store = createStore(rootReducer, {
   data,
-  ui: initialUi({ today, syncCode, firebaseReady: sync.ready }),
+  ui: initialUi({ today, syncCode, firebaseReady: sync.ready, route: routeFromHash() }),
 });
 
 store.subscribe((state, prev, action) => {

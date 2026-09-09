@@ -1,0 +1,79 @@
+import { suite, assertEqual, assertDeepEqual } from "./harness.js";
+import { repeatLabel, timeLabel, triggerLabel } from "../src/domain/format.js";
+import { weekOf, daysOfMonth, formatMonthKR, formatDateDots, isValidTime, isValidDateKey } from "../src/utils/date.js";
+import { monthlyStats } from "../src/domain/metrics.js";
+import { makePolicy } from "../src/domain/schedule.js";
+import { tagsInUse, habitsForDate } from "../src/state/selectors.js";
+import { defaultData } from "../src/domain/migrate.js";
+
+suite("format", (test) => {
+  test("repeatLabel 축약", () => {
+    assertEqual(repeatLabel([1, 2, 3, 4, 5, 6, 7]), "매일");
+    assertEqual(repeatLabel([1, 2, 3, 4, 5]), "평일");
+    assertEqual(repeatLabel([6, 7]), "주말");
+    assertEqual(repeatLabel([5, 1, 3]), "월·수·금");
+    assertEqual(repeatLabel([1, 3], { long: true }), "월요일, 수요일");
+    assertEqual(repeatLabel([]), "–");
+  });
+  test("timeLabel / triggerLabel", () => {
+    assertEqual(timeLabel("09:05", true), "09:05");
+    assertEqual(timeLabel("09:05", false), "AM 9:05");
+    assertEqual(timeLabel("13:30", false), "PM 1:30");
+    assertEqual(timeLabel("00:10", false), "AM 12:10");
+    assertEqual(triggerLabel(null), "–");
+    assertEqual(triggerLabel({ type: "context", value: "출근길" }), "출근길");
+    assertEqual(triggerLabel({ type: "time", value: "07:00" }), "07:00");
+  });
+});
+
+suite("date: 주/월", (test) => {
+  test("weekOf 월요일 시작", () => {
+    assertDeepEqual(weekOf("2026-09-09", 1), ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"]);
+    assertEqual(weekOf("2026-09-13", 1)[0], "2026-09-07"); // 일요일도 같은 주
+  });
+  test("weekOf 일요일 시작", () => {
+    assertEqual(weekOf("2026-09-09", 7)[0], "2026-09-06");
+    assertEqual(weekOf("2026-09-06", 7)[0], "2026-09-06");
+  });
+  test("daysOfMonth와 포맷", () => {
+    assertEqual(daysOfMonth("2026-02").length, 28);
+    assertEqual(daysOfMonth("2028-02").length, 29);
+    assertEqual(formatMonthKR("2026-09"), "2026년 9월");
+    assertEqual(formatDateDots("2026-09-09"), "2026. 9. 9.");
+    assertEqual(isValidTime("23:59"), true);
+    assertEqual(isValidTime("24:00"), false);
+    assertEqual(isValidDateKey("2026-9-9"), false);
+  });
+});
+
+suite("metrics: monthlyStats", (test) => {
+  const habit = (id, days) => ({ id, name: id, emoji: "✅", order: 0, startDate: "2026-09-01", endDate: null, deletedAt: null, policies: [makePolicy("2026-09-01", { repeat: { days } })] });
+  test("예정일만 분모, 미래는 future, 예정 아님은 off", () => {
+    const habits = { a: habit("a", [1, 2, 3, 4, 5, 6, 7]), m: habit("m", [1, 3, 5]) };
+    const checks = { "2026-09-07": { a: 1, m: 1 }, "2026-09-08": { a: 1 } };
+    const stats = monthlyStats(habits, checks, "2026-09", "2026-09-09");
+    const m = stats.perHabit.find((r) => r.habit.id === "m");
+    assertEqual(m.cells["2026-09-07"], "done");
+    assertEqual(m.cells["2026-09-08"], "off");
+    assertEqual(m.cells["2026-09-09"], "missed");
+    assertEqual(m.cells["2026-09-10"], "future");
+    assertEqual(m.scheduled, 4); // 9/2(수) 9/4(금) 9/7(월) 9/9(수)
+    assertEqual(m.done, 1);
+    assertEqual(stats.greenDays, 2); // 9/7(a,m 완료), 9/8(a만 예정이고 완료)
+  });
+  test("기록 없는 지난 달은 pct null", () => {
+    const stats = monthlyStats({ a: habit("a", [1]) }, {}, "2026-08", "2026-09-09");
+    assertEqual(stats.pct, null);
+    assertEqual(stats.perHabit.length, 0);
+  });
+});
+
+suite("selectors: 태그 필터", (test) => {
+  test("tagsInUse는 습관이 쓰는 태그만, habitsForDate는 태그로 거른다", () => {
+    const data = defaultData("2026-09-09");
+    const tags = tagsInUse(data, "2026-09-09").map((t) => t.id);
+    assertDeepEqual(tags, ["morning", "health", "evening"]);
+    assertDeepEqual(habitsForDate(data, "2026-09-09", "health").map((h) => h.id), ["r4"]);
+    assertEqual(habitsForDate(data, "2026-09-09").length, 6);
+  });
+});

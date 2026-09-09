@@ -1,14 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+:root{
+  --ink:#1C1917;--ink-2:#57534E;--muted:#A8A29E;--line:#E7E5E4;--line-2:#F5F5F4;
+  --bg:#F5F5F4;--card:#FFFFFF;--soft:#FAFAF9;
+  --accent:#1F9D55;--accent-dark:#166534;--accent-soft:#DCFCE7;
+  --yellow:#F5B800;--yellow-soft:#FEF3C7;--red:#EF4444;--red-soft:#FEE2E2;--blue:#0284C7;--blue-soft:#F0F9FF;
+  --todo:#6366F1;
+  --radius:12px;--radius-lg:16px;
+  --font:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;--font-num:'Outfit',sans-serif;
+  --tabbar-h:64px;
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow-x:hidden}
-body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(180deg,#FAFAF9 0%,#F5F5F4 100%);color:#1C1917;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top)}
+button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+button{background:none;border:none;cursor:pointer}
 ::-webkit-scrollbar{width:0;display:none}
+
 @keyframes checkPop{0%{transform:scale(.8)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
-@keyframes progressGrow{from{width:0}}
-@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-@keyframes toastIn{from{opacity:0;transform:translateY(40px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(40px) scale(.95)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.check-pop{animation:checkPop .25s ease}.fade-in{animation:fadeIn .3s ease forwards}.slide-in{animation:slideIn .3s ease forwards}.progress-bar{animation:progressGrow .6s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,40px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@keyframes toastOut{from{opacity:1;transform:translate(-50%,0) scale(1)}to{opacity:0;transform:translate(-50%,40px) scale(.95)}}
+.check-pop{animation:checkPop .25s ease}
+.fade-in{animation:fadeIn .25s ease forwards}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
