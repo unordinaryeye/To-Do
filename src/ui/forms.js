@@ -1,4 +1,4 @@
-import { EMOJI_OPTIONS, TAG_COLORS } from "../config.js";
+import { EMOJI_OPTIONS, TAG_COLORS, SUGGESTED_HABITS, MAX_TARGET_COUNT } from "../config.js";
 import { activeTags } from "../state/selectors.js";
 import { h } from "../utils/dom.js";
 import { ISO_DAYS_KR, isValidDateKey, isValidTime, compareKeys } from "../utils/date.js";
@@ -106,9 +106,33 @@ export function renderHabitForm(state, drafts) {
       h("button", { class: "emoji-btn", dataset: { action: "openEmojiSheet" }, "aria-label": "이모지 선택" }, values.emoji),
       h("input", { id: "habitNameField", value: drafts.habitName, placeholder: "루틴 입력", maxlength: "30", dataset: { draft: "habitName" }, "aria-label": "루틴 이름" }),
     ),
+    !editing && !drafts.habitName ? h("div", { class: "form-group" }, h("div", { class: "form-section" },
+      h("div", { class: "k" }, "이런 루틴은 어때요?"),
+      h("div", { class: "chips" }, SUGGESTED_HABITS.map((item, i) => chip(`${item.emoji} ${item.name}`, { small: true, dataset: { action: "formSuggest", i: String(i) } }))),
+    )) : null,
     scheduleEditor(values, drafts),
+    extrasSection(values, drafts),
     tagSection(state, values),
     editing ? h("button", { class: "btn danger-ghost block big", dataset: { action: "askDeleteHabit", id: values.id } }, "삭제") : null,
+  );
+}
+
+function extrasSection(values, drafts) {
+  const target = values.targetCount || 1;
+  const timeHint = drafts.triggerTime ? `${drafts.triggerTime}에 알림` : "시간을 정하면 그 시간에";
+  return h("div", { class: "form-group" },
+    h("div", { class: "form-row" },
+      h("span", { class: "k" }, "✔ 하루 달성 수"),
+      h("span", { class: "v" },
+        h("button", { class: "step-btn", dataset: { action: "formTarget", n: "-1" }, disabled: target <= 1, "aria-label": "줄이기" }, "−"),
+        h("span", { class: "step-val" }, `${target}회`),
+        h("button", { class: "step-btn", dataset: { action: "formTarget", n: "1" }, disabled: target >= MAX_TARGET_COUNT, "aria-label": "늘리기" }, "+"),
+      ),
+    ),
+    h("div", { class: "form-row" },
+      h("span", { class: "k" }, "🔔 알림", h("span", { class: "hint", style: { display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: "400" } }, values.reminderOn ? `${timeHint} · 앱이 열려 있을 때` : "앱이 열려 있을 때 알려드려요")),
+      h("button", { class: `switch${values.reminderOn ? " on" : ""}`, dataset: { action: "formToggleReminder" }, role: "switch", "aria-checked": String(!!values.reminderOn) }, h("span", { class: "knob" })),
+    ),
   );
 }
 

@@ -54,7 +54,7 @@
 .cell{border:1px solid var(--line);border-radius:10px;background:var(--card);display:flex;align-items:center;justify-content:center;min-height:56px}
 .cell.check{cursor:pointer;font-size:22px}
 .cell.check.on{border-color:var(--accent);background:var(--accent-soft)}
-.cell.check.on.todo{border-color:var(--todo);background:#EEF2FF}
+.cell.check.on.todo{border-color:var(--todo);background:var(--soft)}
 .cell.when{flex-direction:column;gap:2px;padding:6px 4px;cursor:pointer;text-align:center}
 .cell.when .t{font-size:13px;font-weight:600;color:var(--ink-2);font-family:var(--font-num)}
 .cell.when .t.ctx{font-family:var(--font);font-size:12px}
@@ -129,9 +129,9 @@
 /* 4분면 매트릭스 */
 .matrix{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mx-cell{border:1px solid var(--line);border-radius:var(--radius);padding:10px;min-height:140px;display:flex;flex-direction:column;gap:6px;background:var(--soft)}
-.mx-cell.q1{background:#FFF7ED;border-color:#FED7AA}
-.mx-cell.q2{background:#F0FDF4;border-color:#BBF7D0}
-.mx-cell.q3{background:#FEFCE8;border-color:#FEF08A}
+.mx-cell.q1{background:var(--yellow-soft);border-color:var(--yellow)}
+.mx-cell.q2{background:var(--accent-soft);border-color:var(--accent)}
+.mx-cell.q3{background:var(--soft);border-color:var(--yellow)}
 .mx-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:2px}
 .mx-count{font-family:var(--font-num);color:var(--muted)}
 .mx-item{display:flex;align-items:flex-start;gap:6px;font-size:13px;line-height:1.3}
@@ -176,7 +176,7 @@
 .gl-cell.blank{background:transparent}
 .gl-cell.future{background:transparent;color:var(--line)}
 .gl-cell.green{background:var(--accent);color:#fff}
-.gl-cell.partial{background:var(--yellow-soft);color:#92400E}
+.gl-cell.partial{background:var(--yellow-soft);color:var(--ink)}
 .gl-cell.zero{background:var(--line-2);color:var(--muted)}
 .gl-cell.none{background:transparent;border:1px dashed var(--line);color:var(--line)}
 .gl-num{font-size:12px;font-weight:600}.gl-sym{font-size:9px;line-height:1}
@@ -208,7 +208,7 @@
 .tw-item.done .mx-title{color:var(--muted);text-decoration:line-through}
 .date-pick{position:relative;overflow:hidden;cursor:pointer;margin-left:4px}
 .date-pick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
-.carry-banner{display:flex;justify-content:space-between;align-items:center;background:var(--yellow-soft);border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#92400E;cursor:pointer}
+.carry-banner{display:flex;justify-content:space-between;align-items:center;background:var(--yellow-soft);border:1px solid var(--yellow);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--ink);cursor:pointer}
 .carry-cta{font-weight:700;color:#D97706}
 
 .mx-cell.q4{background:var(--soft)}
@@ -251,3 +251,11 @@
 .md-mini.center{background:var(--accent-soft);font-weight:700}
 .md-mini.sector{background:var(--accent-soft)}
 .md-mini.core{background:var(--accent-dark);color:#fff}
+
+/* 하루 달성 수 / 알림 */
+.step-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--soft);font-size:16px;color:var(--ink-2)}
+.step-btn:disabled{opacity:.35}
+.step-val{min-width:36px;text-align:center;font-family:var(--font-num)}
+.cell.check.partial{font-size:12px;font-family:var(--font-num);color:var(--ink-2);background:var(--yellow-soft);border-color:var(--yellow)}
+.count-badge{position:absolute;right:3px;bottom:2px;font-size:9px;font-family:var(--font-num);color:var(--accent-dark)}
+.cell.check{position:relative}

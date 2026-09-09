@@ -10,10 +10,19 @@ import { habitFormValues, todoFormValues, tagFormValues } from "../state/selecto
 import { TAG_COLORS } from "../config.js";
 import { parseTodoInput, quadrantById } from "../domain/todo.js";
 import { normalizeMandala } from "../domain/mandala.js";
+import { SUGGESTED_HABITS, MAX_TARGET_COUNT } from "../config.js";
+import { requestNotificationPermission } from "./reminders.js";
+import { checkProgress } from "../state/selectors.js";
 import { habitFormError, initHabitDrafts, initTodoDrafts, initTagDrafts } from "./forms.js";
 import { toast } from "./toast.js";
 
 /** data-action 이름 → 핸들러(el, event). drafts는 입력 중인 텍스트·날짜·시간(비제어). */
+export function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === "light" || theme === "dark") root.dataset.theme = theme;
+  else delete root.dataset.theme;
+}
+
 export function createActions({ store, sync, drafts }) {
   const { dispatch, getState } = store;
   const ui = (patch) => dispatch({ type: A.UI_SET, patch });
@@ -93,6 +102,8 @@ export function createActions({ store, sync, drafts }) {
       startDate: drafts.startDate, endDate: drafts.endDate || null,
       repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
       goalTagIds: values.goalTagIds, showInTodo: values.showInTodo,
+      targetCount: values.targetCount,
+      reminder: values.reminderOn ? { enabled: true, time: drafts.triggerTime || null } : null,
     };
   }
 
@@ -138,8 +149,38 @@ export function createActions({ store, sync, drafts }) {
   };
 
   const habits = {
-    toggleCheck: (el) => dispatch({ type: A.CHECK_TOGGLE, date: selected(), habitId: el.dataset.id }),
-    toggleCheckOn: (el) => dispatch({ type: A.CHECK_TOGGLE, date: el.dataset.date, habitId: el.dataset.id }),
+    toggleCheck: (el) => {
+      const habit = getState().data.habits[el.dataset.id];
+      dispatch({ type: A.CHECK_TOGGLE, date: selected(), habitId: el.dataset.id, target: habit ? checkProgress(getState().data, habit, selected()).target : 1 });
+    },
+    toggleCheckOn: (el) => {
+      const habit = getState().data.habits[el.dataset.id];
+      dispatch({ type: A.CHECK_TOGGLE, date: el.dataset.date, habitId: el.dataset.id, target: habit ? checkProgress(getState().data, habit, el.dataset.date).target : 1 });
+    },
+    formTarget: (el) => {
+      const next = Math.min(MAX_TARGET_COUNT, Math.max(1, (formValues().targetCount || 1) + Number(el.dataset.n)));
+      patchForm({ targetCount: next });
+    },
+    formToggleReminder: async () => {
+      const v = formValues();
+      if (!v.reminderOn) {
+        const perm = await requestNotificationPermission();
+        if (perm === "denied") toast("ℹ️", "시스템 알림은 꺼져 있어요. 앱을 열어 두면 토스트로 알려드려요");
+        if (v.triggerType !== "time" && !drafts.triggerTime) toast("ℹ️", "알림 시간은 '시간' 항목의 값을 써요");
+      }
+      patchForm({ reminderOn: !v.reminderOn });
+    },
+    formSuggest: (el) => {
+      const item = SUGGESTED_HABITS[Number(el.dataset.i)];
+      if (!item) return;
+      drafts.habitName = item.name;
+      if (item.trigger.type === "time") { drafts.triggerTime = item.trigger.value; patchForm({ emoji: item.emoji, triggerType: "time" }); }
+      else { drafts.triggerText = item.trigger.value; patchForm({ emoji: item.emoji, triggerType: "context" }); }
+    },
+    setTheme: (el) => {
+      dispatch({ type: A.SETTINGS_SET, patch: { theme: el.value } });
+      applyTheme(el.value);
+    },
     toggleHomeRange: () => ui({ homeRange: getState().ui.homeRange === "week" ? "day" : "week" }),
     selectDateDay: (el) => ui({ selectedDate: el.dataset.date, homeRange: "day" }),
     pickDate: (el) => { if (isValidDateKey(el.value)) ui({ selectedDate: el.value, homeRange: "day" }); },

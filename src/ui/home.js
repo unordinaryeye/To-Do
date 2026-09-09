@@ -1,6 +1,6 @@
 import { h } from "../utils/dom.js";
 import { ISO_DAYS_KR, weekOf, isoWeekday, fromDateKey, formatMonthKR, monthKey, todayKey } from "../utils/date.js";
-import { habitsForDate, todosForDate, tagsInUse, activeHabits } from "../state/selectors.js";
+import { habitsForDate, todosForDate, tagsInUse, activeHabits, checkProgress } from "../state/selectors.js";
 import { dayStatus, dayProgress, globalStreak, habitStreak, isHabitDone } from "../domain/metrics.js";
 import { currentPolicy } from "../domain/schedule.js";
 import { repeatLabel, triggerLabel } from "../domain/format.js";
@@ -106,7 +106,10 @@ function habitRow(habit, index, state) {
   const policy = currentPolicy(habit, selectedDate);
   const streak = habitStreak(habit, checks, selectedDate);
   const check = checkCell(done, habit.name, { action: "toggleCheck", id: habit.id });
+  const { count, target } = checkProgress(state.data, habit, selectedDate);
   check.textContent = done ? habit.emoji : "";
+  if (!done && count > 0) { check.classList.add("partial"); check.textContent = `${count}/${target}`; }
+  else if (done && target > 1) check.append(h("span", { class: "count-badge" }, `${count}/${target}`));
   return h("div", { class: "row", dataset: { habitId: habit.id } },
     check,
     whenCell(policy, settings.clock24, { action: "openSchedule", id: habit.id }),

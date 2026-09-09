@@ -292,3 +292,28 @@ suite("reducers: 리뷰 반영(휴식 유지, 예약 정책 보존, 동률 order
     assertDeepEqual(todosForDate(s2.data, TODAY).map((t) => t.title), ["그제", "어제"]);
   });
 });
+
+suite("reducers: 하루 달성 수", (test) => {
+  test("목표 1회는 0↔1, 목표 3회는 0→1→2→3→0", () => {
+    let state = freshState();
+    state = rootReducer(state, { type: A.CHECK_TOGGLE, date: TODAY, habitId: "r1" });
+    assertEqual(state.data.checks[TODAY].r1, 1);
+    state = rootReducer(state, { type: A.CHECK_TOGGLE, date: TODAY, habitId: "r1" });
+    assertEqual(state.data.checks[TODAY], undefined);
+    for (let i = 1; i <= 3; i++) {
+      state = rootReducer(state, { type: A.CHECK_TOGGLE, date: TODAY, habitId: "r2", target: 3 });
+      assertEqual(state.data.checks[TODAY].r2, i);
+    }
+    state = rootReducer(state, { type: A.CHECK_TOGGLE, date: TODAY, habitId: "r2", target: 3 });
+    assertEqual(state.data.checks[TODAY], undefined);
+  });
+  test("targetCount 2인 습관은 2회 채워야 달성, 알림은 upsert로 저장", () => {
+    let state = rootReducer(freshState(), newHabit({ id: "r1", name: "물", emoji: "💧", startDate: "2000-01-01", repeatDays: [1, 2, 3, 4, 5, 6, 7], trigger: null, targetCount: 2, reminder: { enabled: true, time: "08:00" } }));
+    assertEqual(state.data.habits.r1.policies.at(-1).targetCount, 2);
+    assertDeepEqual(state.data.habits.r1.reminder, { enabled: true, time: "08:00" });
+    state = rootReducer(state, { type: A.CHECK_TOGGLE, date: TODAY, habitId: "r1", target: 2 });
+    assertEqual(globalStreak({ r1: state.data.habits.r1 }, state.data.checks, TODAY), 0);
+    state = rootReducer(state, { type: A.CHECK_TOGGLE, date: TODAY, habitId: "r1", target: 2 });
+    assertEqual(globalStreak({ r1: state.data.habits.r1 }, state.data.checks, TODAY), 1);
+  });
+});

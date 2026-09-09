@@ -118,7 +118,17 @@ export function habitFormValues(data, id, todayKey) {
     triggerText: policy?.trigger?.type === "context" ? policy.trigger.value : "",
     goalTagIds: policy?.goalTagIds ?? [],
     showInTodo: !!habit?.showInTodo,
+    targetCount: policy?.targetCount ?? 1,
+    reminderOn: !!habit?.reminder?.enabled,
   };
+}
+
+/** 그날 습관의 목표 횟수와 현재 횟수 */
+export function checkProgress(data, habit, dateKey) {
+  const target = Math.max(1, policyAt(habit, dateKey)?.targetCount ?? 1);
+  const value = (data.checks[dateKey] || {})[habit.id];
+  const count = typeof value === "number" ? value : value ? 1 : 0;
+  return { count, target };
 }
 
 export function activeTags(data) {

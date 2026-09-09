@@ -26,3 +26,19 @@ button{background:none;border:none;cursor:pointer}
 .check-pop{animation:checkPop .25s ease}
 .fade-in{animation:fadeIn .25s ease forwards}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* 다크 테마: 시스템 설정 또는 내정보에서 선택 */
+:root[data-theme="dark"]{
+  --ink:#F5F5F4;--ink-2:#D6D3D1;--muted:#78716C;--line:#292524;--line-2:#1F1D1B;
+  --bg:#111110;--card:#1C1A19;--soft:#232120;
+  --accent:#34D399;--accent-dark:#059669;--accent-soft:#064E3B;
+  --yellow:#FBBF24;--yellow-soft:#3F2E0A;--red:#F87171;--red-soft:#3B1A1A;--blue:#38BDF8;--blue-soft:#0C2A3A;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#F5F5F4;--ink-2:#D6D3D1;--muted:#78716C;--line:#292524;--line-2:#1F1D1B;
+    --bg:#111110;--card:#1C1A19;--soft:#232120;
+    --accent:#34D399;--accent-dark:#059669;--accent-soft:#064E3B;
+    --yellow:#FBBF24;--yellow-soft:#3F2E0A;--red:#F87171;--red-soft:#3B1A1A;--blue:#38BDF8;--blue-soft:#0C2A3A;
+  }
+}

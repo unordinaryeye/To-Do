@@ -5,6 +5,8 @@ import { rootReducer, initialUi, A } from "./state/reducers.js";
 import { loadData, saveData, getSyncCode } from "./storage/local.js";
 import { createSync } from "./sync/firestore.js";
 import { mountApp, render } from "./ui/app.js";
+import { applyTheme } from "./ui/actions.js";
+import { startReminders } from "./ui/reminders.js";
 import { toast } from "./ui/toast.js";
 import { routeFromHash } from "./ui/router.js";
 
@@ -37,7 +39,21 @@ store.subscribe((state, prev, action) => {
   render(state);
 });
 
+applyTheme(data.settings.theme);
 mountApp({ store, sync });
+startReminders(() => store.getState());
+
+// 앱 셸 캐시. 새 버전이 준비되면 알려주고, 사용자가 원할 때 새로고침하게 둔다.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").then((reg) => {
+    reg.addEventListener("updatefound", () => {
+      const worker = reg.installing;
+      worker?.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) toast("⬆️", "새 버전이 있어요. 앱을 다시 열면 적용돼요");
+      });
+    });
+  }).catch((error) => console.warn("서비스 워커 등록 실패:", error));
+}
 if (migrated) toast("✨", "데이터를 새 형식으로 옮겼어요");
 if (syncCode && sync.ready) sync.resume(syncCode);
 

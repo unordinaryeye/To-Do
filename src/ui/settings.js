@@ -42,6 +42,16 @@ function weekStartRow(settings) {
   );
 }
 
+function themeRow(settings) {
+  const current = settings.theme || "system";
+  return h("div", { class: "list-item static" },
+    h("div", { class: "li-icon" }, "🌙"),
+    h("div", { class: "li-text" }, h("div", { class: "main" }, "테마"), h("div", { class: "sub" }, "다크 모드")),
+    h("div", { class: "li-right" }, h("select", { dataset: { action: "setTheme" } },
+      [["system", "시스템 따라가기"], ["light", "라이트"], ["dark", "다크"]].map(([v, l]) => h("option", { value: v, selected: current === v }, l)))),
+  );
+}
+
 function sortRow(settings) {
   const on = settings.sortByTime !== false;
   return h("div", { class: "list-item static" },
@@ -64,6 +74,7 @@ export function renderSettings(state, drafts) {
     listItem({ icon: "📂", iconBg: "#FEF3C7", main: "데이터 복원", sub: "백업 파일에서 복원", dataset: { action: "restore" } }),
     weekStartRow(state.data.settings),
     sortRow(state.data.settings),
+    themeRow(state.data.settings),
     listItem({ icon: "⛔", iconBg: "#F5F5F4", main: "끝낸 루틴", sub: ended ? `${ended}개 · 탭해서 다시 시작` : "없음", dataset: { action: "openEnded" } }),
     listItem({ icon: "📊", iconBg: "#F3E8FF", main: "내 기록", sub: `루틴 ${habitCount}개 · 기록된 날 ${days}일 · 탭해서 통계 보기`, right: "›", dataset: { action: "goRoute", route: "stats" } }),
     h("div", { style: { height: "8px" } }),

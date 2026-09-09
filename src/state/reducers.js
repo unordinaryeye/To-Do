@@ -55,9 +55,12 @@ function swapWithNeighbor(map, list, id, dir) {
   return { ...map, [id]: { ...target, order: neighbor.order }, [neighbor.id]: { ...neighbor, order: target.order } };
 }
 
-function toggleCheck(checks, { date, habitId }) {
+/** 목표 1회: 0↔1. 여러 회: 0→1→…→목표→0. target을 안 주면 1. */
+function toggleCheck(checks, { date, habitId, target = 1 }) {
   const day = checks[date] || {};
-  const nextDay = day[habitId] ? without(day, habitId) : { ...day, [habitId]: 1 };
+  const current = typeof day[habitId] === "number" ? day[habitId] : day[habitId] ? 1 : 0;
+  const next = current >= target ? 0 : current + 1;
+  const nextDay = next === 0 ? without(day, habitId) : { ...day, [habitId]: next };
   if (Object.keys(nextDay).length === 0) return without(checks, date);
   return { ...checks, [date]: nextDay };
 }
@@ -68,7 +71,7 @@ function toggleCheck(checks, { date, habitId }) {
  * 시작일을 앞당기면 첫 정책도 같이 앞당겨 공백이 생기지 않게 한다.
  */
 function upsertHabit(habits, action) {
-  const { id, name, emoji, startDate, endDate, repeatDays, trigger, today, goalTagIds, showInTodo } = action;
+  const { id, name, emoji, startDate, endDate, repeatDays, trigger, today, goalTagIds, showInTodo, targetCount, reminder } = action;
   const existing = id ? habits[id] : null;
   const habitId = existing ? id : (id || newId("h"));
   const effectiveFrom = existing ? (compareKeys(startDate, today) > 0 ? startDate : today) : startDate;
@@ -78,7 +81,7 @@ function upsertHabit(habits, action) {
     repeat: { days: [...repeatDays].sort((a, b) => a - b) },
     trigger: trigger?.type ? { type: trigger.type, value: trigger.value } : null,
     goalTagIds: goalTagIds ?? base?.goalTagIds ?? [],
-    targetCount: base?.targetCount ?? 1,
+    targetCount: targetCount ?? base?.targetCount ?? 1,
   });
   const habit = {
     order: maxOrder(Object.values(habits)) + 1,
@@ -87,6 +90,7 @@ function upsertHabit(habits, action) {
     ...(existing || {}),
     id: habitId, name, emoji, startDate, endDate: endDate || null,
     showInTodo: showInTodo ?? existing?.showInTodo ?? false,
+    reminder: reminder === undefined ? (existing?.reminder ?? null) : reminder,
     policies: alignFirstPolicy(existing ? applySettingsFrom(existing.policies, policy) : [policy], startDate),
   };
   return { ...habits, [habitId]: habit };

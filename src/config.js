@@ -43,3 +43,16 @@ export const EMOJI_OPTIONS = ["✅", "💧", "🤸", "📝", "🏃", "📖", "�
 
 
 export const TAG_COLORS = ["#F59E0B", "#3B82F6", "#10B981", "#8B5CF6", "#EC4899", "#F97316", "#14B8A6", "#64748B"];
+
+/** 새 루틴 폼의 추천 칩. trigger는 시간 또는 상황. */
+export const SUGGESTED_HABITS = [
+  { name: "물 한 잔 마시기", emoji: "💧", trigger: { type: "context", value: "일어나자마자" } },
+  { name: "10분 스트레칭", emoji: "🤸", trigger: { type: "time", value: "07:00" } },
+  { name: "영양제 챙기기", emoji: "💊", trigger: { type: "time", value: "08:00" } },
+  { name: "30분 운동", emoji: "🏃", trigger: { type: "time", value: "18:00" } },
+  { name: "독서 20분", emoji: "📖", trigger: { type: "context", value: "자기 전" } },
+  { name: "감사 일기", emoji: "📝", trigger: { type: "context", value: "자기 전" } },
+  { name: "명상 5분", emoji: "🧘", trigger: { type: "time", value: "21:30" } },
+  { name: "내일 할 일 정리", emoji: "📋", trigger: { type: "time", value: "22:00" } },
+];
+export const MAX_TARGET_COUNT = 10;
