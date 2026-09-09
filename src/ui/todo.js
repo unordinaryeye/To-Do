@@ -1,10 +1,7 @@
 import { h } from "../utils/dom.js";
 import { todayKey, formatDateDots } from "../utils/date.js";
-import { todosForDate, quadrantGroups, overdueTodos, habitsInTodo, checkProgress } from "../state/selectors.js";
+import { todosForDate, quadrantGroups, overdueTodos } from "../state/selectors.js";
 import { QUADRANTS, priorityBadges } from "../domain/todo.js";
-import { currentPolicy } from "../domain/schedule.js";
-import { isHabitDone } from "../domain/metrics.js";
-import { triggerLabel } from "../domain/format.js";
 import { renderTodoWeek } from "./week.js";
 import { chip, emptyState } from "./parts.js";
 
@@ -39,10 +36,9 @@ function withNowMarker(rows, todos, state, now) {
 }
 
 function listView(state, todos, now) {
-  const routineRows = habitRows(state);
-  if (!todos.length && !routineRows.length) return emptyState("📌", "할 일이 없어요", "아래 입력창이나 + 버튼으로 추가해요");
+  if (!todos.length) return emptyState("📌", "할 일이 없어요", "아래 입력창이나 + 버튼으로 추가해요");
   const rows = todos.map((todo, i) => listRow(todo, i, state, now));
-  return h("div", { class: "table" }, routineRows, withNowMarker(rows, todos, state, now));
+  return h("div", { class: "table" }, withNowMarker(rows, todos, state, now));
 }
 
 function matrixItem(todo) {
@@ -80,24 +76,6 @@ function carryBanner(state) {
   if (!count) return null;
   return h("div", { class: "carry-banner", dataset: { action: "carryOver", to: selectedDate }, role: "button", tabindex: "0" },
     h("span", null, `지난 미완료 할 일 ${count}개`), h("span", { class: "carry-cta" }, "오늘로 옮기기 ›"));
-}
-
-/** '투두 탭에도 표시'한 습관을 투두 목록 위에 루틴 행으로 보여준다. 체크는 습관 기록으로 들어간다. */
-function habitRows(state) {
-  const { selectedDate } = state.ui;
-  const { checks, settings } = state.data;
-  return habitsInTodo(state.data, selectedDate).map((habit) => {
-    const done = isHabitDone(habit, checks, selectedDate);
-    const policy = currentPolicy(habit, selectedDate);
-    const { count, target } = checkProgress(state.data, habit, selectedDate);
-    const partial = !done && count > 0;
-    return h("div", { class: "row todo-row habit-in-todo" },
-      h("div", { class: "cell when" }, h("span", { class: "t ctx" }, triggerLabel(policy?.trigger, settings.clock24))),
-      h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
-        h("span", { class: "rank" }, "🔁"), h("span", { class: `txt${done ? " done" : ""}` }, `${habit.emoji} ${habit.name}`)),
-      h("div", { class: `cell check${done ? " on check-pop" : ""}${partial ? " partial" : ""}`, dataset: { action: "toggleCheck", id: habit.id }, role: "checkbox", tabindex: "0", "aria-checked": String(done), "aria-label": habit.name }, done ? habit.emoji : partial ? `${count}/${target}` : ""),
-    );
-  });
 }
 
 function body(state) {

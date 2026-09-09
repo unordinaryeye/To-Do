@@ -111,7 +111,7 @@ export function createActions({ store, sync, drafts }) {
       type: A.HABIT_UPSERT, id: values.id, name, emoji,
       startDate: drafts.startDate, endDate: drafts.endDate || null,
       repeatDays: values.repeatDays, trigger: triggerFromForm(values), today: todayKey(),
-      goalTagIds: values.goalTagIds, showInTodo: values.showInTodo,
+      goalTagIds: values.goalTagIds,
     };
     if (!withExtras) return base;
     return {
@@ -303,7 +303,6 @@ export function createActions({ store, sync, drafts }) {
       // 두 플래그를 모두 끄면 Q4가 아니라 미분류로 돌아간다
       patchForm(next.urgent || next.important ? { ...next, classified: true } : { urgent: false, important: false, classified: false });
     },
-    formToggleShowInTodo: () => patchForm({ showInTodo: !formValues().showInTodo }),
     formPriorityClear: () => patchForm({ classified: false, urgent: false, important: false }),
     openQuadrantPicker: (el) => ui({ sheet: { type: "quadrant", id: el.dataset.id } }),
     setQuadrant: (el) => {

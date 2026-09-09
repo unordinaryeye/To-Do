@@ -143,10 +143,6 @@ function extrasSection(values, drafts) {
 function tagSection(state, values) {
   const tags = activeTags(state.data);
   return h("div", { class: "form-group" },
-    h("div", { class: "form-row" },
-      h("span", { class: "k" }, "투두 탭에도 표시"),
-      h("button", { class: `switch${values.showInTodo ? " on" : ""}`, dataset: { action: "formToggleShowInTodo" }, role: "switch", "aria-checked": String(!!values.showInTodo) }, h("span", { class: "knob" })),
-    ),
     h("div", { class: "form-section" },
       h("div", { class: "k" }, "🏷 목표 태그", h("span", { class: "hint" }, values.goalTagIds.length ? `${values.goalTagIds.length}개 선택` : "선택 안 함")),
       h("div", { class: "chips" },
