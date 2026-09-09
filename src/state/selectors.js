@@ -1,5 +1,6 @@
 import { scheduledHabits, currentPolicy, policyAt } from "../domain/schedule.js";
 import { compareKeys } from "../utils/date.js";
+import { compareTodos, quadrantOf, quadrantRank, QUADRANTS } from "../domain/todo.js";
 
 export function activeHabits(data) {
   return Object.values(data.habits).filter((h) => !h.deletedAt).sort((a, b) => a.order - b.order);
@@ -26,24 +27,28 @@ export function tagsInUse(data, todayKey) {
   return Object.values(data.goalTags).filter((tag) => used.has(tag.id) && !tag.archived);
 }
 
-/** 시간 있는 항목 시간순 → 시간 없는 항목 수동 순서. */
+/** 시간 있는 항목 시간순 → 시간 없는 항목은 사분면 순 → 수동 순서. */
 export function todosForDate(data, dateKey) {
-  return Object.values(data.todos)
-    .filter((t) => t.date === dateKey)
-    .sort((a, b) => {
-      if (a.time && b.time) return a.time < b.time ? -1 : a.time > b.time ? 1 : a.order - b.order;
-      if (a.time) return -1;
-      if (b.time) return 1;
-      return a.order - b.order;
-    });
+  return Object.values(data.todos).filter((t) => t.date === dateKey).sort(compareTodos);
 }
 
-/** 투두 이동 가능 여부: 시간 없는 항목 중 첫/마지막이면 해당 방향 불가. */
+/** 투두 이동 가능 여부: 시간 없는 같은 사분면 항목 중 첫/마지막이면 해당 방향 불가. */
 export function todoMoveBounds(data, todo) {
   if (todo.time) return { up: false, down: false };
-  const list = todosForDate(data, todo.date).filter((t) => !t.time);
+  const list = todosForDate(data, todo.date).filter((t) => !t.time && quadrantRank(t) === quadrantRank(todo));
   const index = list.findIndex((t) => t.id === todo.id);
   return { up: index > 0, down: index >= 0 && index < list.length - 1 };
+}
+
+/** 매트릭스 보기: 사분면별 목록 + 미분류. 각 목록은 표시 순서를 따른다. */
+export function quadrantGroups(data, dateKey) {
+  const groups = Object.fromEntries(QUADRANTS.map((q) => [q.id, []]));
+  groups.none = [];
+  for (const todo of todosForDate(data, dateKey)) {
+    const q = quadrantOf(todo);
+    groups[q ? q.id : "none"].push(todo);
+  }
+  return groups;
 }
 
 /** 습관 이동 가능 여부: 선택일 화면 목록 기준. */
@@ -82,5 +87,8 @@ export function todoFormValues(data, id, dateKey) {
     title: todo?.title ?? "",
     date: todo?.date ?? dateKey,
     time: todo?.time ?? "",
+    classified: !!todo?.classified,
+    urgent: !!todo?.urgent,
+    important: !!todo?.important,
   };
 }

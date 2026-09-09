@@ -5,6 +5,7 @@ import { repeatLabel, triggerLabel } from "../domain/format.js";
 import { habitMoveBounds, todoMoveBounds, endedHabits } from "../state/selectors.js";
 import { sheet, actionItem, confirmBox, listItem } from "./parts.js";
 import { scheduleEditor, emojiGrid } from "./forms.js";
+import { QUADRANTS, quadrantOf } from "../domain/todo.js";
 
 function habitSummary(habit, policy, clock24) {
   return h("div", { class: "sheet-summary" },
@@ -42,6 +43,7 @@ function todoActions(state, id) {
     h("div", { class: "sheet-summary" }, h("span", { class: "emoji" }, "📌"), h("div", null, h("div", { class: "name" }, todo.title),
       todo.time ? h("div", { class: "meta" }, "시간이 있는 할 일은 시간순으로 정렬돼요") : null)),
     actionItem("수정하기", "✏️", { action: "openTodoForm", id }),
+    actionItem(`사분면 이동 · ${quadrantOf(todo)?.label ?? "미분류"}`, "⊞", { action: "openQuadrantPicker", id }),
     actionItem("위로 이동", "▲", { action: "moveTodo", id, dir: "-1" }, { disabled: !bounds.up }),
     actionItem("아래로 이동", "▼", { action: "moveTodo", id, dir: "1" }, { disabled: !bounds.down }),
     actionItem("삭제하기", "🗑", { action: "askDeleteTodo", id }, { danger: true }),
@@ -61,6 +63,19 @@ function scheduleSheet(state, drafts) {
     title: `${habit?.emoji ?? ""} ${habit?.name ?? ""}`,
     sub: future ? "바뀐 설정은 시작 날짜부터 적용돼요." : "바뀐 설정은 오늘부터 적용돼요. 지난 기록은 그대로 남아요.",
   });
+}
+
+function quadrantPicker(state, id) {
+  const todo = state.data.todos[id];
+  if (!todo) return null;
+  const current = quadrantOf(todo)?.id ?? "none";
+  const cell = (qid, icon, label, hint) => h("button", { class: `qp-cell${current === qid ? " on" : ""}`, dataset: { action: "setQuadrant", id, quadrant: qid } },
+    h("span", { class: "qp-icon" }, icon), h("span", { class: "qp-label" }, label), h("span", { class: "qp-hint" }, hint));
+  return sheet([
+    h("div", { class: "qp-grid" }, QUADRANTS.map((q) => cell(q.id, q.icon, q.label, q.hint))),
+    cell("none", "📥", "미분류", "아직 정하지 않음"),
+    h("button", { class: "sheet-close", dataset: { action: "closeSheet" } }, "닫기"),
+  ], { title: todo.title, sub: "긴급·중요 여부로 사분면을 고릅니다" });
 }
 
 function fabMenu(state) {
@@ -99,6 +114,7 @@ export function renderSheet(state, drafts) {
     case "todoActions": return todoActions(state, s.id);
     case "schedule": return scheduleSheet(state, drafts);
     case "emoji": return sheet([emojiGrid(state.ui.page?.values.emoji)], { title: "이모지 선택" });
+    case "quadrant": return quadrantPicker(state, s.id);
     case "fab": return fabMenu(state);
     case "ended": return endedSheet(state);
     case "confirmEndHabit": {

@@ -1,5 +1,6 @@
 import { makePolicy, withPolicy, alignFirstPolicy, currentPolicy, scheduledHabits } from "../domain/schedule.js";
 import { compareKeys } from "../utils/date.js";
+import { quadrantRank } from "../domain/todo.js";
 import { newId } from "../utils/id.js";
 
 // ── 액션 타입 ──
@@ -11,6 +12,7 @@ export const A = {
   HABIT_DELETE: "habit/delete",
   HABIT_MOVE: "habit/move",
   TODO_UPSERT: "todo/upsert",
+  TODO_PRIORITY: "todo/priority",
   TODO_TOGGLE: "todo/toggle",
   TODO_DELETE: "todo/delete",
   TODO_MOVE: "todo/move",
@@ -91,22 +93,32 @@ function habitsReducer(habits, action) {
 
 const todosOfDate = (todos, date) => Object.values(todos).filter((t) => t.date === date);
 
-/** 시간 없는 항목만 수동 순서를 가진다. 시간 있는 항목은 시간순이라 이동 대상이 아니다. */
-export const untimedTodos = (todos, date) => todosOfDate(todos, date).filter((t) => !t.time).sort((a, b) => a.order - b.order);
+/** 시간 없는 항목만 수동 순서를 가진다. 같은 사분면 안에서만 순서를 바꾼다. */
+export const untimedPeers = (todos, todo) => todosOfDate(todos, todo.date)
+  .filter((t) => !t.time && quadrantRank(t) === quadrantRank(todo))
+  .sort((a, b) => a.order - b.order);
 
-function upsertTodo(todos, { id, title, date, time }) {
+function upsertTodo(todos, { id, title, date, time, priority }) {
   const existing = id ? todos[id] : null;
   const todoId = existing ? id : newId("t");
   const movedDate = !existing || existing.date !== date;
   const order = movedDate ? maxOrder(todosOfDate(todos, date)) + 1 : existing.order;
+  const classification = priority === undefined ? {} : priorityFields(priority);
   return {
     ...todos,
     [todoId]: {
-      urgent: false, important: false, done: false, completedAt: null, goalTagIds: [],
+      urgent: false, important: false, classified: false, done: false, completedAt: null, goalTagIds: [],
       ...(existing || {}),
       id: todoId, title, date, time: time || null, order,
+      ...classification,
     },
   };
+}
+
+/** priority: null(미분류) 또는 { urgent, important } */
+function priorityFields(priority) {
+  if (!priority) return { urgent: false, important: false, classified: false };
+  return { urgent: !!priority.urgent, important: !!priority.important, classified: true };
 }
 
 function todosReducer(todos, action) {
@@ -118,10 +130,11 @@ function todosReducer(todos, action) {
       const done = !todo.done;
       return { ...todos, [action.id]: { ...todo, done, completedAt: done ? new Date().toISOString() : null } };
     }
+    case A.TODO_PRIORITY: return todo ? { ...todos, [action.id]: { ...todo, ...priorityFields(action.priority) } } : todos;
     case A.TODO_DELETE: return todo ? without(todos, action.id) : todos;
     case A.TODO_MOVE: {
       if (!todo || todo.time) return todos;
-      return swapWithNeighbor(todos, untimedTodos(todos, todo.date), action.id, action.dir);
+      return swapWithNeighbor(todos, untimedPeers(todos, todo), action.id, action.dir);
     }
     default: return todos;
   }

@@ -6,6 +6,7 @@ import { currentPolicy } from "../domain/schedule.js";
 import { repeatLabel, triggerLabel } from "../domain/format.js";
 import { needsBackupReminder } from "../storage/local.js";
 import { chip, emptyState } from "./parts.js";
+import { renderTodosTab } from "./todo.js";
 
 const SWIPE_MIN_PX = 40;
 
@@ -126,35 +127,6 @@ function habitsTab(state) {
   return h("div", { class: "table" }, habits.map((habit, i) => habitRow(habit, i, state)));
 }
 
-function todoRow(todo, index, state, now) {
-  const late = todo.time && !todo.done && state.ui.selectedDate === todayKey() && todo.time < now;
-  const check = checkCell(todo.done, todo.title, { action: "toggleTodo", id: todo.id }, " todo");
-  check.textContent = todo.done ? "✔" : "";
-  return h("div", { class: "row todo-row" },
-    check,
-    h("div", { class: "cell when", dataset: { action: "openTodoForm", id: todo.id }, role: "button", tabindex: "0", "aria-label": "시간 설정" },
-      h("span", { class: `t${late ? " late" : ""}` }, todo.time ? `${todo.time}${late ? "!" : ""}` : "–")),
-    h("div", { class: "cell name", dataset: { action: "openTodoActions", id: todo.id }, role: "button", tabindex: "0" },
-      h("span", { class: "rank" }, String(index + 1)),
-      h("span", { class: `txt${todo.done ? " done" : ""}` }, todo.title),
-    ),
-  );
-}
-
-function todosTab(state, drafts) {
-  const todos = todosForDate(state.data, state.ui.selectedDate);
-  const now = new Date().toTimeString().slice(0, 5);
-  return h("div", null,
-    todos.length
-      ? h("div", { class: "table" }, todos.map((todo, i) => todoRow(todo, i, state, now)))
-      : emptyState("📌", "할 일이 없어요", "아래 입력창이나 + 버튼으로 추가해요"),
-    h("div", { class: "quick-add" },
-      h("input", { id: "todoInputField", value: drafts.todo, placeholder: "할 일 빠른 추가", maxlength: "60", dataset: { draft: "todo", enter: "quickAddTodo" }, "aria-label": "할 일 빠른 추가" }),
-      h("button", { class: "btn dark", dataset: { action: "quickAddTodo" } }, "추가"),
-    ),
-  );
-}
-
 function completeBanner(state) {
   const { selectedDate } = state.ui;
   const { habits, checks } = state.data;
@@ -179,7 +151,7 @@ export function renderHome(state, drafts) {
     segment(tab),
     h("div", { class: "home-body" },
       tab === "habits" ? filterRow(state) : null,
-      tab === "habits" ? habitsTab(state) : todosTab(state, drafts),
+      tab === "habits" ? habitsTab(state) : renderTodosTab(state, drafts),
       completeBanner(state),
     ),
     h("button", { class: "fab", dataset: { action: "openFab" }, "aria-label": "추가" }, "+"),

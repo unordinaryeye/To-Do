@@ -7,6 +7,7 @@ import { downloadBackup } from "../storage/backup.js";
 import { defaultData } from "../domain/migrate.js";
 import { REPEAT_PRESETS } from "../domain/format.js";
 import { habitFormValues, todoFormValues } from "../state/selectors.js";
+import { parseTodoInput, quadrantById } from "../domain/todo.js";
 import { habitFormError, initHabitDrafts, initTodoDrafts } from "./forms.js";
 import { toast } from "./toast.js";
 
@@ -123,7 +124,9 @@ export function createActions({ store, sync, drafts }) {
     toggleTodo: (el) => dispatch({ type: A.TODO_TOGGLE, id: el.dataset.id }),
     openTodoActions: (el) => ui({ sheet: { type: "todoActions", id: el.dataset.id } }),
     openTodoForm: (el) => {
-      const values = todoFormValues(getState().data, el?.dataset.id || null, selected());
+      let values = todoFormValues(getState().data, el?.dataset.id || null, selected());
+      const preset = el?.dataset.quadrant && quadrantById(el.dataset.quadrant);
+      if (preset) values = { ...values, classified: true, urgent: preset.urgent, important: preset.important };
       initTodoDrafts(drafts, values);
       ui({ sheet: null, page: { type: "todoForm", values } });
       focusById("todoTitleField");
@@ -134,15 +137,30 @@ export function createActions({ store, sync, drafts }) {
       if (!values || !title) { toast("⚠️", "할 일을 입력해 주세요"); return; }
       if (!isValidDateKey(drafts.todoDate)) { toast("⚠️", "날짜를 확인해 주세요"); return; }
       const time = isValidTime(drafts.todoTime) ? drafts.todoTime : null;
-      dispatch({ type: A.TODO_UPSERT, id: values.id, title, date: drafts.todoDate, time });
+      const priority = values.classified ? { urgent: values.urgent, important: values.important } : null;
+      dispatch({ type: A.TODO_UPSERT, id: values.id, title, date: drafts.todoDate, time, priority });
       ui({ page: null, sheet: null, selectedDate: drafts.todoDate, homeTab: "todos" });
     },
     quickAddTodo: () => {
-      const title = drafts.todo.trim();
-      if (!title) return;
+      const parsed = parseTodoInput(drafts.todo);
+      if (!parsed.title) return;
       drafts.todo = "";
-      dispatch({ type: A.TODO_UPSERT, id: null, title, date: selected(), time: null });
+      dispatch({ type: A.TODO_UPSERT, id: null, title: parsed.title, date: selected(), time: parsed.time });
+      if (parsed.time) toast("🕒", `${parsed.time}에 추가했어요`);
       focusById("todoInputField");
+    },
+    setTodoView: (el) => dispatch({ type: A.SETTINGS_SET, patch: { todoView: el.dataset.view } }),
+    formPriority: (el) => {
+      const v = formValues();
+      const flag = el.dataset.flag;
+      patchForm({ classified: true, urgent: !!v.urgent, important: !!v.important, [flag]: v.classified ? !v[flag] : true });
+    },
+    formPriorityClear: () => patchForm({ classified: false, urgent: false, important: false }),
+    openQuadrantPicker: (el) => ui({ sheet: { type: "quadrant", id: el.dataset.id } }),
+    setQuadrant: (el) => {
+      const q = quadrantById(el.dataset.quadrant);
+      dispatch({ type: A.TODO_PRIORITY, id: el.dataset.id, priority: q ? { urgent: q.urgent, important: q.important } : null });
+      ui({ sheet: null });
     },
     moveTodo: (el) => dispatch({ type: A.TODO_MOVE, id: el.dataset.id, dir: Number(el.dataset.dir) }),
     askDeleteTodo: (el) => ui({ sheet: { type: "confirmDeleteTodo", id: el.dataset.id } }),
