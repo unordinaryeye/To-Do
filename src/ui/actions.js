@@ -29,6 +29,9 @@ export function createActions({ store, sync, drafts }) {
     goToday: () => ui({ selectedDate: todayKey() }),
     selectDate: (el) => ui({ selectedDate: el.dataset.date }),
     moveStatsMonth: (el) => ui({ statsMonth: addMonths(getState().ui.statsMonth, Number(el.dataset.n)) }),
+    moveStatsWeek: (el) => ui({ statsDate: addDays(getState().ui.statsDate, Number(el.dataset.n)) }),
+    setStatsTab: (el) => ui({ statsTab: el.dataset.tab }),
+    goHomeDate: (el) => ui({ route: "home", homeTab: "habits", selectedDate: el.dataset.date }),
     toggleFilterTag: (el) => ui({ filterTagId: getState().ui.filterTagId === el.dataset.id ? null : el.dataset.id }),
     closeSheet: (el, event) => {
       const isBackdrop = el.classList.contains("overlay") || el.classList.contains("fab-menu");

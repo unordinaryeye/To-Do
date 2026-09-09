@@ -1,7 +1,7 @@
 import { suite, assertEqual, assertDeepEqual } from "./harness.js";
 import { repeatLabel, timeLabel, triggerLabel } from "../src/domain/format.js";
 import { weekOf, daysOfMonth, formatMonthKR, formatDateDots, isValidTime, isValidDateKey } from "../src/utils/date.js";
-import { monthlyStats } from "../src/domain/metrics.js";
+import { monthlyStats, weeklyStats, greenLightStats } from "../src/domain/metrics.js";
 import { makePolicy } from "../src/domain/schedule.js";
 import { tagsInUse, habitsForDate } from "../src/state/selectors.js";
 import { defaultData } from "../src/domain/migrate.js";
@@ -75,5 +75,38 @@ suite("selectors: 태그 필터", (test) => {
     assertDeepEqual(tags, ["morning", "health", "evening"]);
     assertDeepEqual(habitsForDate(data, "2026-09-09", "health").map((h) => h.id), ["r4"]);
     assertEqual(habitsForDate(data, "2026-09-09").length, 6);
+  });
+});
+
+suite("metrics: weeklyStats / greenLightStats", (test) => {
+  const habit = (id, days, over = {}) => ({ id, name: id, emoji: "✅", order: 0, startDate: "2026-09-01", endDate: null, deletedAt: null, policies: [makePolicy("2026-09-01", { repeat: { days } })], ...over });
+  const week = ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"];
+  test("주간: 셀 상태와 요일별 달성률, 미래 제외", () => {
+    const habits = { a: habit("a", [1, 2, 3, 4, 5, 6, 7]), m: habit("m", [1, 3, 5]) };
+    const checks = { "2026-09-07": { a: 1, m: 1 }, "2026-09-08": { a: 1 } };
+    const s = weeklyStats(habits, checks, week, "2026-09-09");
+    const m = s.perHabit.find((r) => r.habit.id === "m");
+    assertDeepEqual([m.cells["2026-09-07"], m.cells["2026-09-08"], m.cells["2026-09-09"], m.cells["2026-09-10"]], ["done", "off", "missed", "future"]);
+    assertEqual(s.perDay[0].pct, 100);
+    assertEqual(s.perDay[1].pct, 100); // 화: a만 예정
+    assertEqual(s.perDay[2].pct, 0);
+    assertEqual(s.perDay[3].future, true);
+    assertEqual(s.greenDays, 2);
+    assertEqual(s.pct, 60); // done 3 / scheduled 5 (월 a,m 화 a 수 a,m)
+  });
+  test("초록불: 날짜 상태와 최장 연속", () => {
+    const habits = { a: habit("a", [1, 2, 3, 4, 5, 6, 7]) };
+    const checks = { "2026-09-01": { a: 1 }, "2026-09-02": { a: 1 }, "2026-09-04": { a: 1 } };
+    const g = greenLightStats(habits, checks, "2026-09", "2026-09-05");
+    assertDeepEqual(g.days.slice(0, 5).map((d) => d.state), ["green", "green", "zero", "green", "zero"]);
+    assertEqual(g.days[5].state, "future");
+    assertEqual(g.greenDays, 3);
+    assertEqual(g.longestStreak, 2);
+  });
+  test("초록불: 예정 없는 날은 none", () => {
+    const habits = { m: habit("m", [1]) };
+    const g = greenLightStats(habits, {}, "2026-09", "2026-09-09");
+    assertEqual(g.days[0].state, "none"); // 9/1 화
+    assertEqual(g.days[6].state, "zero"); // 9/7 월
   });
 });

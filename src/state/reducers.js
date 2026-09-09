@@ -186,6 +186,8 @@ export function initialUi({ today, syncCode, firebaseReady, route = "home" }) {
     homeTab: "habits",   // habits | todos
     selectedDate: today,
     statsMonth: today.slice(0, 7),
+    statsTab: "month",   // month | week | green
+    statsDate: today,    // 주간 통계 기준일
     filterTagId: null,
     page: null,          // { type: 'habitForm'|'todoForm', values } 전체 화면
     sheet: null,         // { type, ... } 바텀시트

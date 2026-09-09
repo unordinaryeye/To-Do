@@ -155,3 +155,28 @@
 .color-dot{width:32px;height:32px;border-radius:50%;border:3px solid transparent}
 .color-dot.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--card) inset}
 .quick-add{padding-right:72px}
+
+/* 통계 탭 */
+.stats-tabs{margin-bottom:6px}
+.wk-table{padding:12px 10px}
+.wk-row{display:grid;grid-template-columns:1fr repeat(7,26px);align-items:center;gap:2px;padding:6px 0;border-bottom:1px solid var(--line-2)}
+.wk-row:last-child{border-bottom:none}
+.wk-row.head{color:var(--muted);font-size:11px;border-bottom:1px solid var(--line)}
+.wk-name{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+.wk-cell{text-align:center;font-size:14px;color:var(--line)}
+.wk-cell.done{color:var(--accent)}.wk-cell.missed{color:var(--muted)}.wk-cell.off{color:var(--line)}
+.bar-list{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:grid;grid-template-columns:20px 1fr 40px;align-items:center;gap:8px;font-size:12px}
+.bar-label{color:var(--muted)}.bar-pct{text-align:right;font-family:var(--font-num);color:var(--ink-2)}
+.progress-fill.green{background:var(--accent)}
+.legend{font-size:11px;color:var(--muted);text-align:center;margin-top:10px}
+.gl-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.gl-head{text-align:center;font-size:11px;color:var(--muted);padding-bottom:4px}
+.gl-cell{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--line-2);font-family:var(--font-num)}
+.gl-cell.blank{background:transparent}
+.gl-cell.future{background:transparent;color:var(--line)}
+.gl-cell.green{background:var(--accent);color:#fff}
+.gl-cell.partial{background:var(--yellow-soft);color:#92400E}
+.gl-cell.zero{background:var(--line-2);color:var(--muted)}
+.gl-cell.none{background:transparent;border:1px dashed var(--line);color:var(--line)}
+.gl-num{font-size:12px;font-weight:600}.gl-sym{font-size:9px;line-height:1}

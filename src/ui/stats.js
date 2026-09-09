@@ -1,6 +1,9 @@
 import { h } from "../utils/dom.js";
 import { formatMonthKR, isoWeekday, todayKey, fromDateKey, ISO_DAYS_KR } from "../utils/date.js";
 import { monthlyStats, monthlyTodoStats } from "../domain/metrics.js";
+import { renderWeekView, renderGreenView } from "./stats-views.js";
+
+const TABS = [["month", "월간"], ["week", "주간"], ["green", "초록불"]];
 
 function weekdayHeader(weekStart) {
   const days = Array.from({ length: 7 }, (_, i) => ((weekStart - 1 + i) % 7) + 1);
@@ -42,7 +45,7 @@ function summaryCard(stats, todoStats) {
   );
 }
 
-export function renderStats(state) {
+function renderMonthView(state) {
   const { statsMonth } = state.ui;
   const { habits, checks, todos, settings } = state.data;
   const today = todayKey();
@@ -50,8 +53,7 @@ export function renderStats(state) {
   const todoStats = monthlyTodoStats(todos, statsMonth);
   const weekStart = settings.weekStart ?? 1;
   const isCurrent = statsMonth === today.slice(0, 7);
-  return h("div", { class: "screen fade-in" },
-    h("div", { class: "page-title" }, "통계"),
+  return [
     h("div", { class: "stats-head" },
       h("button", { class: "arrow", dataset: { action: "moveStatsMonth", n: "-1" }, "aria-label": "지난달" }, "‹"),
       h("span", null, formatMonthKR(statsMonth)),
@@ -61,5 +63,17 @@ export function renderStats(state) {
     stats.perHabit.length
       ? h("div", { class: "stat-grid" }, stats.perHabit.map((row) => habitCard(row, stats.days, weekStart)))
       : h("div", { class: "empty-state" }, h("div", { class: "big" }, "📭"), h("p", { class: "main" }, "이 달엔 기록이 없어요")),
+  ];
+}
+
+const VIEWS = { month: renderMonthView, week: renderWeekView, green: renderGreenView };
+
+export function renderStats(state) {
+  const tab = state.ui.statsTab || "month";
+  return h("div", { class: "screen fade-in" },
+    h("div", { class: "page-title" }, "통계"),
+    h("div", { class: "seg2 stats-tabs", role: "tablist" }, TABS.map(([id, label]) =>
+      h("button", { class: tab === id ? "on" : "", dataset: { action: "setStatsTab", tab: id }, role: "tab", "aria-selected": String(tab === id) }, label))),
+    ...VIEWS[tab](state),
   );
 }

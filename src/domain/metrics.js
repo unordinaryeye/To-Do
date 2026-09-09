@@ -133,6 +133,49 @@ function longestRun(flags) {
   return best;
 }
 
+function cellState(habit, checks, day, todayKey) {
+  if (compareKeys(day, todayKey) > 0) return "future";
+  if (!isScheduled(habit, day)) return "off";
+  return isHabitDone(habit, checks, day) ? "done" : "missed";
+}
+
+/** 주간 통계: 습관 × 7일 셀 + 요일별 달성률 */
+export function weeklyStats(habits, checks, days, todayKey) {
+  const perHabit = Object.values(habits)
+    .filter((h) => !h.deletedAt)
+    .sort((a, b) => a.order - b.order)
+    .map((habit) => {
+      const cells = Object.fromEntries(days.map((day) => [day, cellState(habit, checks, day, todayKey)]));
+      const scheduled = Object.values(cells).filter((c) => c === "done" || c === "missed").length;
+      const done = Object.values(cells).filter((c) => c === "done").length;
+      return { habit, cells, scheduled, done };
+    })
+    .filter((row) => row.scheduled > 0 || Object.values(row.cells).some((c) => c === "future"));
+  const perDay = days.map((day) => {
+    const status = dayStatus(habits, checks, day);
+    return { day, future: compareKeys(day, todayKey) > 0, pct: status.pct, allDone: status.allDone };
+  });
+  const totals = perHabit.reduce((acc, r) => ({ scheduled: acc.scheduled + r.scheduled, done: acc.done + r.done }), { scheduled: 0, done: 0 });
+  return {
+    days, perHabit, perDay,
+    pct: totals.scheduled ? Math.round((totals.done / totals.scheduled) * 100) : null,
+    greenDays: perDay.filter((d) => d.allDone).length,
+  };
+}
+
+/** 초록불 캘린더: 날짜별 'green' | 'partial' | 'zero' | 'none' | 'future' */
+export function greenLightStats(habits, checks, month, todayKey) {
+  const days = daysOfMonth(month).map((day) => {
+    if (compareKeys(day, todayKey) > 0) return { day, state: "future" };
+    const status = dayStatus(habits, checks, day);
+    if (status.scheduled === 0) return { day, state: "none" };
+    if (status.allDone) return { day, state: "green" };
+    return { day, state: status.done > 0 ? "partial" : "zero", pct: status.pct };
+  });
+  const green = days.filter((d) => d.state !== "future").map((d) => d.state === "green");
+  return { month, days, greenDays: green.filter(Boolean).length, longestStreak: longestRun(green) };
+}
+
 /** 월간 투두 집계 */
 export function monthlyTodoStats(todos, month) {
   const list = Object.values(todos).filter((t) => t.date.startsWith(month));
