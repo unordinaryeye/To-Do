@@ -1,7 +1,7 @@
 import { h } from "../utils/dom.js";
 import { ISO_DAYS_KR, weekOf, isoWeekday, fromDateKey, formatMonthKR, monthKey, todayKey } from "../utils/date.js";
 import { habitsForDate, todosForDate, tagsInUse, activeHabits, checkProgress } from "../state/selectors.js";
-import { dayStatus, dayProgress, globalStreak, habitStreak, isHabitDone } from "../domain/metrics.js";
+import { dayStatus, dayProgress, globalStreak, isHabitDone } from "../domain/metrics.js";
 import { currentPolicy } from "../domain/schedule.js";
 import { repeatLabel, triggerLabel } from "../domain/format.js";
 import { needsBackupReminder } from "../storage/local.js";
@@ -104,7 +104,6 @@ function habitRow(habit, index, state) {
   const { checks, settings } = state.data;
   const done = isHabitDone(habit, checks, selectedDate);
   const policy = currentPolicy(habit, selectedDate);
-  const streak = habitStreak(habit, checks, selectedDate);
   const check = checkCell(done, habit.name, { action: "toggleCheck", id: habit.id });
   const { count, target } = checkProgress(state.data, habit, selectedDate);
   check.textContent = done ? habit.emoji : "";
@@ -115,7 +114,6 @@ function habitRow(habit, index, state) {
     h("div", { class: "cell name", dataset: { action: "openHabitActions", id: habit.id }, role: "button", tabindex: "0" },
       h("span", { class: "rank" }, String(index + 1)),
       h("span", { class: "txt" }, `${habit.emoji} ${habit.name}`),
-      streak > 0 ? h("span", { class: "fire hot", "aria-label": `연속 ${streak}회` }, `🔥${streak}`) : null,
     ),
     check,
   );
